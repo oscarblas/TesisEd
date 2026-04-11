@@ -1,5 +1,5 @@
 %%% respuesta_escalon.m
-%%% Respuesta escalon - Comparacion lineal vs no lineal con calculo de FIT%
+%%% Respuesta escalon desde cero - Comparacion lineal vs no lineal con FIT%
 %%% Sistema de 4 tanques acoplados
 %%% Todo en MATLAB puro (sin Simulink)
 
@@ -56,29 +56,30 @@ B_mat = [0            (1-y2)*k2/A1;
 C_mat = eye(4);
 D_mat = zeros(4,2);
 
-%% Entrada escalon (perturbacion pequena alrededor del punto de operacion)
-% Escalon del 5% en u1 a partir de t = 100s
-% Escalon del 5% en u2 a partir de t = 500s
-pct = 0.05;   % 5% de perturbacion
+%% Condiciones iniciales y entrada escalon
+% Tanques vacios al inicio
+h_initial = [0; 0; 0; 0];
 
+% Entrada: escalon de 0 a los valores estacionarios u10, u20
 u1_vec = u10 * ones(length(t), 1);
 u2_vec = u20 * ones(length(t), 1);
-
-u1_vec(101:end) = u10 * (1 + pct);   % +5% en u1
-u2_vec(501:end) = u20 * (1 + pct);   % +5% en u2
 
 %% Simulacion del modelo NO LINEAL (ode45)
 params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
                'a1',a1,'a2',a2,'a3',a3,'a4',a4, ...
                'k1',k1,'k2',k2,'y1',y1,'y2',y2,'g',g);
 
-[~, h_nolin] = ode45(@(t_ode, h) modelo_nolineal(t_ode, h, t, u1_vec, u2_vec, params), t, h0);
+[~, h_nolin] = ode45(@(t_ode, h) modelo_nolineal(t_ode, h, t, u1_vec, u2_vec, params), t, h_initial);
 
 %% Simulacion del modelo LINEAL (lsim)
-sys_lin = ss(A_mat, B_mat, C_mat, D_mat);
-delta_u = [u1_vec - u10, u2_vec - u20];
-delta_h = lsim(sys_lin, delta_u, t);
-h_lin   = delta_h + h0';
+% En el modelo lineal: delta_h = h - h0, delta_u = u - u0
+% Condicion inicial en desviacion: delta_h(0) = h_initial - h0 = -h0
+% Entrada en desviacion: delta_u = u0 - u0 = 0 (entrada constante en el estacionario)
+sys_lin  = ss(A_mat, B_mat, C_mat, D_mat);
+delta_h0 = h_initial - h0;                  % condicion inicial en desviacion = -h0
+delta_u  = zeros(length(t), 2);             % delta_u = 0 (u = u0)
+delta_h  = lsim(sys_lin, delta_u, t, delta_h0);
+h_lin    = delta_h + h0';                   % h = h0 + delta_h
 
 %% Graficas de respuesta
 figure('Name','Respuesta Escalon','NumberTitle','off')
@@ -89,28 +90,29 @@ for i = 1:4
     subplot(2,2,i)
     plot(t, h_nolin(:,i), 'b', 'LineWidth', 1.5); hold on;
     plot(t, h_lin(:,i), 'r--', 'LineWidth', 1.5);
+    yline(h0(i), 'k:', 'h_0', 'LineWidth', 1);
     ylabel(['h_' num2str(i) ' (cm)']);
     xlabel('Tiempo (s)');
-    legend('No lineal', 'Lineal', 'Location', 'best');
+    legend('No lineal', 'Lineal', 'Estacionario', 'Location', 'best');
     title(titulos{i});
     grid on;
 end
-sgtitle('Respuesta escalon: Modelo no lineal vs linealizado');
+sgtitle('Respuesta escalon desde h=0 hacia el punto de operacion');
 
 %% Graficas de entradas
 figure('Name','Entradas','NumberTitle','off')
 subplot(2,1,1)
 stairs(t, u1_vec, 'b', 'LineWidth', 1.5);
 ylabel('u_1'); xlabel('Tiempo (s)');
-title(['Entrada u_1 (escalon +' num2str(pct*100) '% en t=100s)']);
+title(['Entrada u_1 = ' num2str(u10, '%.2f') ' (estacionario)']);
 grid on;
 
 subplot(2,1,2)
 stairs(t, u2_vec, 'r', 'LineWidth', 1.5);
 ylabel('u_2'); xlabel('Tiempo (s)');
-title(['Entrada u_2 (escalon +' num2str(pct*100) '% en t=500s)']);
+title(['Entrada u_2 = ' num2str(u20, '%.2f') ' (estacionario)']);
 grid on;
-sgtitle('Senales de entrada');
+sgtitle('Senales de entrada (escalon de 0 a valores estacionarios)');
 
 %% Calculo de FIT%
 fprintf('=== FIT%% ===\n');
@@ -119,15 +121,6 @@ for i = 1:4
                      norm(h_nolin(:,i) - mean(h_nolin(:,i))));
     fprintf('FIT h%d = %.2f%%\n', i, FIT);
 end
-
-%% Error maximo y minimo en tanques inferiores (h3, h4)
-fprintf('\n=== Error maximo en h3, h4 (respecto al punto de operacion) ===\n');
-fprintf('Error max h3 = %.2f%%\n', max(h_nolin(:,3))/h30*100 - 100);
-fprintf('Error max h4 = %.2f%%\n', max(h_nolin(:,4))/h40*100 - 100);
-
-fprintf('\n=== Error minimo en h3, h4 ===\n');
-fprintf('Error min h3 = %.2f%%\n', 100 - min(h_nolin(:,3))/h30*100);
-fprintf('Error min h4 = %.2f%%\n', 100 - min(h_nolin(:,4))/h40*100);
 
 %% ====================================================================
 %  Funcion del modelo no lineal
