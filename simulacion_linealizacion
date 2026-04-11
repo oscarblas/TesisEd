@@ -109,9 +109,9 @@ u(1001:2000,3) = u20*0.7;
 %%% Simulacion en Simulink
 out = sim('planta_piloto_simulacion');
 
-% Extraer variables del objeto de salida
-h_nolin = out.h_nolin;
-h_lin   = out.h_lin;
+% Extraer variables del objeto de salida (formato Timeseries)
+h_nolin = out.h_nolin.Data;
+h_lin   = out.h_lin.Data;
 
 %%% Graficas
 figure
