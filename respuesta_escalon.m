@@ -56,14 +56,16 @@ B_mat = [0            (1-y2)*k2/A1;
 C_mat = eye(4);
 D_mat = zeros(4,2);
 
-%% Entrada escalon
-% Escalon del 30% en u1 a partir de t = 100s
-% Escalon del 30% en u2 a partir de t = 500s
+%% Entrada escalon (perturbacion pequena alrededor del punto de operacion)
+% Escalon del 5% en u1 a partir de t = 100s
+% Escalon del 5% en u2 a partir de t = 500s
+pct = 0.05;   % 5% de perturbacion
+
 u1_vec = u10 * ones(length(t), 1);
 u2_vec = u20 * ones(length(t), 1);
 
-u1_vec(101:end) = u10 * 1.3;   % +30% en u1
-u2_vec(501:end) = u20 * 1.3;   % +30% en u2
+u1_vec(101:end) = u10 * (1 + pct);   % +5% en u1
+u2_vec(501:end) = u20 * (1 + pct);   % +5% en u2
 
 %% Simulacion del modelo NO LINEAL (ode45)
 params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
@@ -100,13 +102,13 @@ figure('Name','Entradas','NumberTitle','off')
 subplot(2,1,1)
 stairs(t, u1_vec, 'b', 'LineWidth', 1.5);
 ylabel('u_1'); xlabel('Tiempo (s)');
-title('Entrada u_1 (escalon +30% en t=100s)');
+title(['Entrada u_1 (escalon +' num2str(pct*100) '% en t=100s)']);
 grid on;
 
 subplot(2,1,2)
 stairs(t, u2_vec, 'r', 'LineWidth', 1.5);
 ylabel('u_2'); xlabel('Tiempo (s)');
-title('Entrada u_2 (escalon +30% en t=500s)');
+title(['Entrada u_2 (escalon +' num2str(pct*100) '% en t=500s)']);
 grid on;
 sgtitle('Senales de entrada');
 
