@@ -1,0 +1,159 @@
+%%% Simulacion y comparacion del modelo linealizado
+
+%%% Parametro de simulacion
+Ts = 1;             % Tiempo de muestreo
+t_f = 2000;         % Tiempo de simulacion
+
+%%% Parametros fisicos de la planta piloto
+% Areas de los tanques
+A1 = 706.85; 
+A2 = 706.85; 
+A3 = 706.85; 
+A4 = 706.85; 
+
+% Areas de salida
+a1 = 1.89; 
+a2 = 1.89; 
+a3 = 5.39; 
+a4 = 5.39; 
+
+% Ganancia de bombas
+k1 = 1; 
+k2 = 1; 
+
+% Valvulas
+y1 = 0.7;
+y2 = 0.7; 
+
+% Gravedad
+g = 981; 
+
+%%% Modelo linealizado
+
+%%% Punto de operacion
+h30 = 25; 
+h40 = 25; 
+
+% Entradas en estado estacionario
+M_A = [(1-y1)*k1   y2*k2;
+       y1*k1       (1-y2)*k2];
+
+M_B = [a3*sqrt(2*g*h30);
+       a4*sqrt(2*g*h40)];
+
+u0 = inv(M_A)*M_B;
+
+u10 = u0(1);
+u20 = u0(2);
+
+% Alturas superiores en equilibrio
+h10 = ((1-y2)*k2*u20/a1)^2/(2*g);
+h20 = ((1-y1)*k1*u10/a2)^2/(2*g);
+
+h0 = [h10; h20; h30; h40];
+
+h_inic = h0;
+dh_inic = h_inic - h0;
+
+%%% Matrices linealizadas
+T1 = A1/a1 * sqrt(2*h10/g);
+T2 = A2/a2 * sqrt(2*h20/g);
+T3 = A3/a3 * sqrt(2*h30/g);
+T4 = A4/a4 * sqrt(2*h40/g);
+
+a11 = -1/T1;
+a22 = -1/T2;
+a32 = A2/(A3*T2);
+a33 = -1/T3;
+a41 = A1/(A4*T1);
+a44 = -1/T4;
+
+b12 = (1-y2)*k2/A1;
+b21 = (1-y1)*k1/A2;
+b32 = y2*k2/A3;
+b41 = y1*k1/A4;
+
+A = [a11 0   0   0;
+     0   a22 0   0;
+     0   a32 a33 0;
+     a41 0   0   a44];
+
+B = [0   b12;
+     b21 0;
+     0   b32;
+     b41 0];
+
+C2 = eye(4); % todos los estados
+
+C = [0 0 1 0;
+     0 0 0 1]; % salidas controladas
+
+D2 = zeros(4,2);
+D  = zeros(2,2);
+
+%%% Señales de entrada
+t = (0:Ts:t_f-1)';
+
+u = ones(t_f,3);
+u(:,1) = t;
+u(:,2) = u10;
+u(:,3) = u20;
+
+% Perturbaciones
+u(601:1200,2) = u10*1.3;
+u(1201:2000,2) = u10*0.7;
+
+u(101:1000,3) = u20*1.3;
+u(1001:2000,3) = u20*0.7;
+
+%%% Simulacion en Simulink
+sim('planta_piloto_simulacion');
+
+%%% Graficas
+figure
+
+subplot(2,2,1)
+plot(t,h_nolin(:,1),'b'); hold on;
+plot(t,h_lin(:,1),'r');
+ylabel('h1'); xlabel('tiempo');
+legend('no lineal','lineal');
+
+subplot(2,2,2)
+plot(t,h_nolin(:,2),'b'); hold on;
+plot(t,h_lin(:,2),'r');
+ylabel('h2'); xlabel('tiempo');
+legend('no lineal','lineal');
+
+subplot(2,2,3)
+plot(t,h_nolin(:,3),'b'); hold on;
+plot(t,h_lin(:,3),'r');
+ylabel('h3'); xlabel('tiempo');
+legend('no lineal','lineal');
+
+subplot(2,2,4)
+plot(t,h_nolin(:,4),'b'); hold on;
+plot(t,h_lin(:,4),'r');
+ylabel('h4'); xlabel('tiempo');
+legend('no lineal','lineal');
+
+figure
+plot(u(:,2),'b'); hold on;
+plot(u(:,3),'r');
+legend('entrada u1','entrada u2');
+
+%%% Evaluacion (fit)
+disp('Error maximo (%)')
+disp(max(h_nolin(:,3))/h30*100 - 100)
+disp(max(h_nolin(:,4))/h40*100 - 100)
+
+disp('Error minimo (%)')
+disp(100 - min(h_nolin(:,3))/h30*100)
+disp(100 - min(h_nolin(:,4))/h40*100)
+
+FIT_h1 = 100 * (1 - norm(h_nolin(:,1)-h_lin(:,1)) / norm(h_nolin(:,1)-mean(h_nolin(:,1))));
+FIT_h2 = 100 * (1 - norm(h_nolin(:,2)-h_lin(:,2)) / norm(h_nolin(:,2)-mean(h_nolin(:,2))));
+FIT_h3 = 100 * (1 - norm(h_nolin(:,3)-h_lin(:,3)) / norm(h_nolin(:,3)-mean(h_nolin(:,3))));
+FIT_h4 = 100 * (1 - norm(h_nolin(:,4)-h_lin(:,4)) / norm(h_nolin(:,4)-mean(h_nolin(:,4))));
+
+disp('FIT (%)')
+disp([FIT_h1 FIT_h2 FIT_h3 FIT_h4])
