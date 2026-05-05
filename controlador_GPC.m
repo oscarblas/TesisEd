@@ -79,7 +79,7 @@ Cc = [0 0 1 0;
 Dc = zeros(2,2);
 
 % Discretizacion con ZOH (zero-order hold)
-Ts = 5;                                % Periodo de muestreo [s]
+Ts = 2;                                % Periodo de muestreo [s] (reducido para respuesta mas rapida)
 sys_c = ss(Ac, Bc, Cc, Dc);
 sys_d = c2d(sys_c, Ts, 'zoh');
 [Ad, Bd, Cd, Dd] = ssdata(sys_d);
@@ -138,8 +138,8 @@ n_xi = size(A_t,1);   % dimension del estado aumentado
 %    Phi = matriz que captura el efecto de los Du futuros (lower-triangular)
 % ========================================================================
 
-N  = 20;   % Horizonte de prediccion
-Nu = 5;    % Horizonte de control (Nu <= N)
+N  = 50;   % Horizonte de prediccion (cubre dinamica completa de los tanques)
+Nu = 10;   % Horizonte de control (mayor flexibilidad para optimizar)
 
 % Matriz F (apila C_t * A_t^j)
 F = zeros(N*ny, n_xi);
@@ -177,8 +177,8 @@ end
 % ========================================================================
 
 % Pesos por canal (ajustables)
-delta = [1, 1];        % peso de seguimiento para [h3, h4]
-lambda = [0.5, 0.5];   % peso de esfuerzo de control para [Du1, Du2]
+delta = [10, 10];          % peso de seguimiento para [h3, h4] (alto = sigue rapido la ref)
+lambda = [0.01, 0.01];     % peso de esfuerzo de control [Du1, Du2] (bajo = control agresivo)
 
 % Matrices de ponderacion (block-diagonales)
 Q = kron(eye(N),  diag(delta));    % size: (N*ny) x (N*ny)
@@ -204,10 +204,10 @@ H = (H + H')/2;   % asegurar simetria numerica
 % ========================================================================
 
 % Limites fisicos (tu los ajustas segun la planta real)
-Du_max = [50; 50];           % maximo cambio por paso por entrada
+Du_max = [100; 100];         % maximo cambio por paso (mas margen para respuesta rapida)
 Du_min = -Du_max;
 
-u_max = [u10*1.5; u20*1.5];  % limite superior absoluto (50% sobre estacionario)
+u_max = [u10*2; u20*2];      % limite superior absoluto (100% sobre estacionario)
 u_min = [0; 0];              % las bombas no pueden dar caudal negativo
 
 % Matriz T: u_futuro = T*DU + ones*u(k-1)
