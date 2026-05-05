@@ -79,7 +79,10 @@ Cc = [0 0 1 0;
 Dc = zeros(2,2);
 
 % Discretizacion con ZOH (zero-order hold)
-Ts = 2;                                % Periodo de muestreo [s] (reducido para respuesta mas rapida)
+% Ts obtenido del analisis comparativo de sintonizacion (analisis_sintonizacion_GPC.m)
+% Metodo ganador: Optimizacion numerica via fminsearch
+%   Score = 0.0733 | IAE = 213.7 | t_est = 18s | overshoot = 0.05%
+Ts = 2;                                % Periodo de muestreo [s]
 sys_c = ss(Ac, Bc, Cc, Dc);
 sys_d = c2d(sys_c, Ts, 'zoh');
 [Ad, Bd, Cd, Dd] = ssdata(sys_d);
@@ -138,8 +141,9 @@ n_xi = size(A_t,1);   % dimension del estado aumentado
 %    Phi = matriz que captura el efecto de los Du futuros (lower-triangular)
 % ========================================================================
 
-N  = 50;   % Horizonte de prediccion (cubre dinamica completa de los tanques)
-Nu = 10;   % Horizonte de control (mayor flexibilidad para optimizar)
+% Horizontes obtenidos del analisis de sintonizacion (metodo ganador: optimizacion numerica)
+N  = 50;   % Horizonte de prediccion
+Nu = 9;    % Horizonte de control (optimo encontrado por fminsearch)
 
 % Matriz F (apila C_t * A_t^j)
 F = zeros(N*ny, n_xi);
@@ -176,9 +180,9 @@ end
 %  Forma estandar para quadprog:  min  0.5*DU'*H*DU + f'*DU
 % ========================================================================
 
-% Pesos por canal (ajustables)
-delta = [10, 10];          % peso de seguimiento para [h3, h4] (alto = sigue rapido la ref)
-lambda = [0.01, 0.01];     % peso de esfuerzo de control [Du1, Du2] (bajo = control agresivo)
+% Pesos optimos del analisis comparativo (metodo: optimizacion numerica fminsearch)
+delta  = [10, 10];                    % peso de seguimiento para [h3, h4]
+lambda = [0.0076803, 0.0076803];      % peso de esfuerzo de control [Du1, Du2] (optimo)
 
 % Matrices de ponderacion (block-diagonales)
 Q = kron(eye(N),  diag(delta));    % size: (N*ny) x (N*ny)
