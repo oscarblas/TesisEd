@@ -259,6 +259,21 @@ ref = zeros(ny, N_steps);
 ref(:,1:round(500/Ts))     = repmat([25; 25], 1, round(500/Ts));      % inicial
 ref(:,round(500/Ts)+1:end) = repmat([30; 20], 1, N_steps - round(500/Ts));  % nuevo SP
 
+% ---------- TRAYECTORIA DE REFERENCIA (suavizado del setpoint) ----------
+% Para evitar sobreimpulso, no se persigue el setpoint de golpe sino una
+% trayectoria suave hacia el. En cada instante k se construye:
+%
+%     w(k+j) = alpha^j * y(k) + (1 - alpha^j) * r(k+j)
+%
+% donde alpha en [0,1] es el factor de suavizado:
+%   alpha = 0     -> sin filtro (perseguir el setpoint inmediato)
+%   alpha = 0.7   -> suavizado moderado (recomendado para tu sistema)
+%   alpha cerca 1 -> trayectoria muy lenta (puede no llegar a tiempo)
+%
+% Esta tecnica reduce drasticamente el sobreimpulso sin sacrificar mucho
+% tiempo de establecimiento, y NO requiere cambiar lambda.
+alpha = 0.7;
+
 % Inicializacion
 h_real    = h0;                % planta NO lineal arranca en el punto de operacion
 u_actual  = [u10; u20];        % entrada actual = entrada estacionaria
@@ -290,13 +305,16 @@ for k = 1:N_steps-1
     y_lin     = Cd*x_lin;                       % y en desviacion
     xi        = [Dx_lin; y_lin];                % estado aumentado
 
-    % ---- (2) Vector de referencia futuro (en desviacion) ----------------
-    % El modelo lineal trabaja en desviaciones, asi que la referencia
-    % tambien se debe expresar como w - y0  (donde y0 = [h30; h40]).
+    % ---- (2) Vector de referencia futuro CON TRAYECTORIA SUAVIZADA -----
+    % Aplica el filtro: w(k+j) = alpha^j * y(k) + (1-alpha^j) * r(k+j)
+    % Trabajando en desviaciones: y_lin(k) y r_dev = ref - y0
+    y_actual_dev = h_real(3:4) - [h30; h40];   % salida actual en desviacion
     W = zeros(N*ny,1);
     for j = 1:N
         idx = min(k+j, N_steps);
-        w_j = ref(:,idx) - [h30; h40];
+        r_dev = ref(:,idx) - [h30; h40];
+        % Trayectoria suavizada hacia el setpoint
+        w_j = alpha^j * y_actual_dev + (1 - alpha^j) * r_dev;
         W((j-1)*ny+1:j*ny) = w_j;
     end
 
