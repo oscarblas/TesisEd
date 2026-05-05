@@ -306,15 +306,18 @@ for k = 1:N_steps-1
     xi        = [Dx_lin; y_lin];                % estado aumentado
 
     % ---- (2) Vector de referencia futuro CON TRAYECTORIA SUAVIZADA -----
-    % Aplica el filtro: w(k+j) = alpha^j * y(k) + (1-alpha^j) * r(k+j)
-    % Trabajando en desviaciones: y_lin(k) y r_dev = ref - y0
-    y_actual_dev = h_real(3:4) - [h30; h40];   % salida actual en desviacion
+    % Filtro: w(k+j) = alpha^j * y(k) + (1-alpha^j) * r(k)
+    %
+    % IMPORTANTE: usamos r(k) (setpoint ACTUAL), NO r(k+j) (futuro).
+    % Esto elimina la "anticipacion" del controlador: no sabra del cambio
+    % hasta que efectivamente ocurra. Es el caso realista en plantas
+    % industriales y es como se comporta el DMC clasico.
+    y_actual_dev = h_real(3:4) - [h30; h40];      % salida actual en desviacion
+    r_actual_dev = ref(:,k) - [h30; h40];         % setpoint ACTUAL en desviacion
     W = zeros(N*ny,1);
     for j = 1:N
-        idx = min(k+j, N_steps);
-        r_dev = ref(:,idx) - [h30; h40];
-        % Trayectoria suavizada hacia el setpoint
-        w_j = alpha^j * y_actual_dev + (1 - alpha^j) * r_dev;
+        % Trayectoria suavizada hacia el setpoint actual (sin preview)
+        w_j = alpha^j * y_actual_dev + (1 - alpha^j) * r_actual_dev;
         W((j-1)*ny+1:j*ny) = w_j;
     end
 
