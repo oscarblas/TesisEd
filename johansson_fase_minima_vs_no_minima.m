@@ -116,62 +116,53 @@ h0_nomin = [P_nomin.h10; P_nomin.h20; P_nomin.h30; P_nomin.h40];
                      t, h0_nomin);
 
 %% ========================================================================
-%  GRAFICAS COMPARATIVAS
+%  GRAFICA COMPARATIVA (entradas y salidas en una sola figura)
+%  ------------------------------------------------------------------------
+%  Convencion de colores y estilos:
+%    Entradas:  Dv1 verde, Dv2 naranja   (escalones aplicados)
+%    Salidas:   Dh1 azul,  Dh2 rojo
+%    Estilo:    linea solida -> fase MINIMA
+%               linea punteada -> fase NO MINIMA
+%  Asi: mismo COLOR = misma variable, mismo ESTILO = mismo caso
 % ========================================================================
 
-% --- Tanques inferiores (controlados): h1 y h2 -----------------------
-figure('Name','Johansson - h1 y h2 (tanques inferiores)','NumberTitle','off')
+% Deltas de las entradas (igual para ambos casos: escalon de +1V en v1)
+dv1 = v1_p - P_min.v10;    % equivalente a v1_n - P_nomin.v10 (mismo perfil)
+dv2 = v2_p - P_min.v20;
 
+naranja = [1 0.5 0];
+
+figure('Name','Johansson - Entradas vs salidas','NumberTitle','off', ...
+       'Position',[100 100 900 600])
+
+% --- Subplot 1: ENTRADAS (escalones aplicados) -----------------------
 subplot(2,1,1)
-plot(t, h_min(:,1)   - P_min.h10,   'b', 'LineWidth', 1.6); hold on;
-plot(t, h_nomin(:,1) - P_nomin.h10, 'r', 'LineWidth', 1.6);
-xline(100,'k:','escalon en v_1');
-ylabel('\Delta h_1 (cm)'); xlabel('Tiempo (s)');
-legend(P_min.nombre, P_nomin.nombre, 'Location','best');
-title('Respuesta de h_1 ante escalon en v_1 (variacion respecto al estacionario)');
+stairs(t, dv1, 'Color', 'g', 'LineWidth', 2); hold on;
+stairs(t, dv2, 'Color', naranja, 'LineWidth', 2);
+xline(100, 'k:', 'LineWidth', 1);
+ylabel('\Delta v (V)'); xlabel('Tiempo (s)');
+legend('\Delta v_1','\Delta v_2','Location','best');
+title('Entradas: escalones aplicados sobre el punto de operacion');
+ylim([-0.3 1.3]); grid on;
+
+% --- Subplot 2: SALIDAS (h1 y h2) en ambos casos ---------------------
+subplot(2,1,2)
+plot(t, h_min(:,1)  - P_min.h10,    'b',  'LineWidth', 1.8); hold on;
+plot(t, h_min(:,2)  - P_min.h20,    'r',  'LineWidth', 1.8);
+plot(t, h_nomin(:,1)- P_nomin.h10,  'b--','LineWidth', 1.8);
+plot(t, h_nomin(:,2)- P_nomin.h20,  'r--','LineWidth', 1.8);
+xline(100, 'k:', 'LineWidth', 1);
+yline(0,'k:');
+ylabel('\Delta h (cm)'); xlabel('Tiempo (s)');
+legend('\Delta h_1 - fase minima', ...
+       '\Delta h_2 - fase minima', ...
+       '\Delta h_1 - fase no minima', ...
+       '\Delta h_2 - fase no minima', ...
+       'Location','best');
+title('Salidas: respuesta de h_1 y h_2 (mismo color = misma variable, punteado = fase no minima)');
 grid on;
 
-subplot(2,1,2)
-plot(t, h_min(:,2)   - P_min.h20,   'b', 'LineWidth', 1.6); hold on;
-plot(t, h_nomin(:,2) - P_nomin.h20, 'r', 'LineWidth', 1.6);
-xline(100,'k:','escalon en v_1');
-ylabel('\Delta h_2 (cm)'); xlabel('Tiempo (s)');
-legend(P_min.nombre, P_nomin.nombre, 'Location','best');
-title('Respuesta de h_2 ante escalon en v_1');
-grid on;
-
-% --- Tanques superiores: h3 y h4 -------------------------------------
-figure('Name','Johansson - h3 y h4 (tanques superiores)','NumberTitle','off')
-
-subplot(2,1,1)
-plot(t, h_min(:,3)   - P_min.h30,   'b', 'LineWidth', 1.6); hold on;
-plot(t, h_nomin(:,3) - P_nomin.h30, 'r', 'LineWidth', 1.6);
-xline(100,'k:','escalon en v_1');
-ylabel('\Delta h_3 (cm)'); xlabel('Tiempo (s)');
-legend(P_min.nombre, P_nomin.nombre, 'Location','best');
-title('Respuesta de h_3'); grid on;
-
-subplot(2,1,2)
-plot(t, h_min(:,4)   - P_min.h40,   'b', 'LineWidth', 1.6); hold on;
-plot(t, h_nomin(:,4) - P_nomin.h40, 'r', 'LineWidth', 1.6);
-xline(100,'k:','escalon en v_1');
-ylabel('\Delta h_4 (cm)'); xlabel('Tiempo (s)');
-legend(P_min.nombre, P_nomin.nombre, 'Location','best');
-title('Respuesta de h_4'); grid on;
-
-% --- Comparacion alturas absolutas -----------------------------------
-figure('Name','Johansson - Alturas absolutas','NumberTitle','off')
-nombres = {'h_1 (inferior)','h_2 (inferior)','h_3 (superior)','h_4 (superior)'};
-for i = 1:4
-    subplot(2,2,i)
-    plot(t, h_min(:,i),   'b', 'LineWidth', 1.5); hold on;
-    plot(t, h_nomin(:,i), 'r', 'LineWidth', 1.5);
-    xline(100,'k:');
-    ylabel([nombres{i} ' (cm)']); xlabel('Tiempo (s)');
-    legend('Fase minima','Fase no minima','Location','best');
-    title(nombres{i}); grid on;
-end
-sgtitle('Sistema de Johansson - Respuesta al escalon (alturas absolutas)');
+sgtitle('Sistema de Johansson - Comparativa fase minima vs no minima');
 
 %% ========================================================================
 %  ANALISIS DE LA RESPUESTA INVERSA (sello de la fase no minima)
