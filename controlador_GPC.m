@@ -130,6 +130,34 @@ for i = 1:ny
     end
 end
 
+%% ------------------------------------------------------------------------
+%  Salida para la TESIS - Tabla 3.1 y Figura 3.X de la seccion 3.3.2
+%  Muestra los coeficientes de respuesta al escalon g_ij[k] que conforman
+%  la matriz dinamica G.
+%  ------------------------------------------------------------------------
+fprintf('\n=== TABLA 3.1: Coeficientes de respuesta al escalon ===\n');
+fprintf('     Primeros 10 valores de g_ij[k]\n\n');
+T_g = table((1:10)', g_step{1,1}(1:10), g_step{1,2}(1:10), ...
+                     g_step{2,1}(1:10), g_step{2,2}(1:10), ...
+            'VariableNames', {'k','g11','g12','g21','g22'});
+disp(T_g);
+fprintf('Valores asintoticos (k = N = %d):\n', N);
+fprintf('  g11[N] = %.4f    g12[N] = %.4f\n', g_step{1,1}(end), g_step{1,2}(end));
+fprintf('  g21[N] = %.4f    g22[N] = %.4f\n\n', g_step{2,1}(end), g_step{2,2}(end));
+
+figure('Name','Fig 3.X - Coeficientes de respuesta al escalon','NumberTitle','off')
+k_vec = 1:N;
+plot(k_vec, g_step{1,1}, 'b-o', 'LineWidth', 1.3); hold on;
+plot(k_vec, g_step{1,2}, 'r-s', 'LineWidth', 1.3);
+plot(k_vec, g_step{2,1}, 'g-^', 'LineWidth', 1.3);
+plot(k_vec, g_step{2,2}, 'k-d', 'LineWidth', 1.3);
+xlabel('k (paso de muestreo)'); ylabel('g_{ij}[k]   (cm)');
+legend('g_{11}  (u_1 \rightarrow h_3)', 'g_{12}  (u_2 \rightarrow h_3)', ...
+       'g_{21}  (u_1 \rightarrow h_4)', 'g_{22}  (u_2 \rightarrow h_4)', ...
+       'Location','best');
+title('Coeficientes de respuesta al escalon de cada subproceso');
+grid on;
+
 %% ========================================================================
 %  5) MATRICES DE PONDERACION Y HESSIANO
 % ========================================================================
