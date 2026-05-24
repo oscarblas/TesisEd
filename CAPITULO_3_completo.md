@@ -158,9 +158,50 @@ $$ \mathbf{G}(z^{-1}) = \begin{bmatrix} G_{11}(z^{-1}) & G_{12}(z^{-1}) \\ G_{21
 \mathbf{G}(z^{-1}) = \begin{bmatrix} G_{11}(z^{-1}) & G_{12}(z^{-1}) \\ G_{21}(z^{-1}) & G_{22}(z^{-1}) \end{bmatrix},\quad G_{ij}(z^{-1}) = \frac{B_{ij}(z^{-1})}{A_{ij}(z^{-1})}
 ```
 
-Esta forma polinomial es la que permite identificar directamente los polinomios `A_{ij}(z⁻¹)` y `B_{ij}(z⁻¹)` requeridos por el modelo CARIMA introducido en la sección 2.2.2, los cuales se emplean en el siguiente subapartado para construir la matriz dinámica del controlador.
+Esta forma polinomial es la que permite identificar directamente los polinomios `A_{ij}(z⁻¹)` y `B_{ij}(z⁻¹)` requeridos por el modelo CARIMA introducido en la sección 2.2.2, los cuales se emplean en los siguientes subapartados para construir la matriz dinámica del controlador.
 
-### 3.3.2 Construcción de la matriz dinámica G
+### 3.3.2 Selección del horizonte del modelo y del tiempo de muestreo
+
+Antes de proceder a la construcción de la matriz dinámica **G** y al cálculo de los coeficientes de respuesta al escalón, resulta imprescindible fijar dos parámetros del modelo del controlador: el **tiempo de muestreo** `T_s` y el **horizonte del modelo** `N`. Estos parámetros, a diferencia de los pesos `λ` y los horizontes `N_u`, **no son objeto del proceso de sintonización** abordado en la sección 3.4: se derivan directamente del análisis de la dinámica de la planta y permanecen fijos durante todo el diseño del controlador. Esta separación es estándar en la literatura del control predictivo basado en modelo y se observa tanto en el método clásico de Shridhar y Cooper [pendiente encontrar fuente — Shridhar & Cooper 1997] como en las implementaciones reportadas para la misma planta piloto [10] [pendiente encontrar fuente — Oré Sánchez].
+
+**Selección del tiempo de muestreo.** El criterio empleado es el propuesto por Shridhar y Cooper, según el cual el tiempo de muestreo debe ser una fracción de la constante de tiempo más rápida de los subprocesos del sistema, garantizando así que la dinámica más veloz quede capturada con resolución suficiente:
+
+**Preview:**
+
+$$ T_s = \min\left( 0.1 \cdot \tau_{ij} \right) $$
+
+**LaTeX para Word:**
+
+```latex
+T_s = \min\left( 0.1 \cdot \tau_{ij} \right)
+```
+
+donde `τ_{ij}` es la constante de tiempo dominante de cada subproceso `(i, j)` obtenida de la matriz de funciones de transferencia. Para el sistema de cuatro tanques acoplados, las constantes de tiempo `τ_{ij}` calculadas a partir del modelo linealizado se encuentran en el rango de los segundos, lo cual conduce a un valor `T_s = 2 s` adoptado en esta tesis.
+
+**Selección del horizonte del modelo.** El horizonte del modelo `N` define cuántos coeficientes de respuesta al escalón conforman cada bloque de la matriz dinámica **G**. Su valor debe ser lo suficientemente grande para que las respuestas al escalón de todos los subprocesos hayan alcanzado prácticamente su valor asintótico, condición necesaria para que el modelo de predicción no trunque información dinámica relevante. La regla de Shridhar y Cooper establece:
+
+**Preview:**
+
+$$ N = \max\left( \frac{5\,\tau_{ij}}{T_s} + 1 \right) $$
+
+**LaTeX para Word:**
+
+```latex
+N = \max\left( \frac{5\,\tau_{ij}}{T_s} + 1 \right)
+```
+
+evaluado sobre todas las constantes de tiempo del sistema. Sustituyendo los valores de la planta se obtiene `N = 50`, valor adoptado en esta tesis.
+
+**Tabla 3.1 — Parámetros del modelo del controlador GPC fijados a priori**
+
+| Parámetro | Símbolo | Valor adoptado | Criterio |
+|---|---|---|---|
+| Tiempo de muestreo | `T_s` | 2 s | `min(0.1 · τ_{ij})` |
+| Horizonte del modelo | `N` | 50 | `max(5·τ_{ij}/T_s + 1)` |
+
+Conviene enfatizar que estos valores se mantienen **constantes** durante todo el diseño y la sintonización del controlador: en la sección 3.4 únicamente se ajustan los parámetros propiamente de sintonización, a saber, el horizonte de control `N_u` y los pesos `δ` y `λ`. Con `T_s` y `N` ya definidos, el siguiente subapartado aborda la construcción de la matriz dinámica **G**.
+
+### 3.3.3 Construcción de la matriz dinámica G
 
 De acuerdo con la formulación CARIMA y la aplicación de las ecuaciones diofánticas presentada en la sección 2.2.2, la predicción de las salidas futuras se expresa de forma matricial como:
 
@@ -236,9 +277,9 @@ $$ \mathbf{G}_{ij} = \begin{bmatrix} g_{ij}[1] & 0 & 0 & \cdots & 0 \\ g_{ij}[2]
 
 La triangularidad inferior refleja el principio de causalidad: un incremento aplicado en el instante `k+c` no puede afectar predicciones de instantes anteriores `k+r` con `r < c`.
 
-[INSERTAR TABLA 3.1 — Coeficientes de respuesta al escalón `g_{ij}[k]` calculados para el sistema de cuatro tanques. Columnas: `k`, `g_{11}`, `g_{12}`, `g_{21}`, `g_{22}`. Filas: `k = 1` a `k = N`. Datos generados con el script `controlador_GPC.m` —específicamente las celdas `g_step{i,j}`—.]
+[INSERTAR TABLA 3.2 — Coeficientes de respuesta al escalón `g_{ij}[k]` calculados para el sistema de cuatro tanques. Columnas: `k`, `g_{11}`, `g_{12}`, `g_{21}`, `g_{22}`. Filas: primeros 10 valores más el asintótico. Datos generados con el script `controlador_GPC.m` —específicamente las celdas `g_step{i,j}`—.]
 
-### 3.3.3 Cálculo de la respuesta libre F
+### 3.3.4 Cálculo de la respuesta libre F
 
 La respuesta libre **F** representa la trayectoria que seguiría la salida del proceso si **no se aplicaran nuevos incrementos de control** durante el horizonte de predicción, es decir, manteniendo `Δu(k+j) = 0` para todo `j ≥ 0`. En el desarrollo diofántico, esta respuesta corresponde al término `F_j(z⁻¹)·y(t)` más la contribución de incrementos pasados, y depende exclusivamente de información disponible al instante actual.
 
@@ -278,7 +319,7 @@ $$ \mathbf{F} = [\hat{y}_{free,1}(k+1),\ldots,\hat{y}_{free,1}(k+N),\hat{y}_{fre
 
 Es importante destacar que **F** se actualiza en cada periodo de muestreo, incorporando la información más reciente del estado del proceso, lo cual permite al controlador adaptarse de manera continua a perturbaciones y discrepancias entre el modelo nominal y la planta real.
 
-### 3.3.4 Vector de referencia futura
+### 3.3.5 Vector de referencia futura
 
 El vector de referencia futura **W** apila los valores deseados de las salidas controladas a lo largo del horizonte de predicción. En la presente formulación se asume que el setpoint `r(k)` permanece constante durante todo el horizonte:
 
@@ -306,7 +347,7 @@ $$ \mathbf{W} = [r_1(k),\ldots,r_1(k),r_2(k),\ldots,r_2(k)]^{T} $$
 
 donde cada componente se repite `N` veces.
 
-### 3.3.5 Función de costo y ley de control sin restricciones
+### 3.3.6 Función de costo y ley de control sin restricciones
 
 La función de costo cuadrática multivariable, definida en la sección 2.2.4, se expresa en forma matricial como:
 
@@ -348,7 +389,7 @@ $$ \Delta\mathbf{U}^{*} = (\mathbf{G}^{T}\,\mathbf{Q}\,\mathbf{G} + \mathbf{R})^
 
 Por el principio de horizonte deslizante, únicamente el primer incremento de cada canal se aplica efectivamente a la planta, y el problema se resuelve nuevamente en el siguiente periodo de muestreo con la información actualizada.
 
-### 3.3.6 Tratamiento de restricciones (formulación QP)
+### 3.3.7 Tratamiento de restricciones (formulación QP)
 
 En aplicaciones industriales reales, el GPC debe respetar restricciones físicas sobre los actuadores. En el sistema de cuatro tanques se consideran dos tipos:
 
@@ -426,7 +467,7 @@ $$ \mathbf{H} = 2\,(\mathbf{G}^{T}\,\mathbf{Q}\,\mathbf{G} + \mathbf{R}),\quad \
 
 Este problema se resuelve mediante el algoritmo `quadprog` de MATLAB, basado en métodos de punto interior, cuya convergencia está garantizada por la convexidad del problema [pendiente encontrar fuente]. La matriz **H** y la matriz de restricciones **A_ineq** son constantes y se calculan una sola vez fuera de línea, mientras que **f** y **b_ineq** se actualizan en cada iteración con los nuevos valores de **F** y `u(k-1)`.
 
-### 3.3.7 Diagrama de flujo del controlador GPC
+### 3.3.8 Diagrama de flujo del controlador GPC
 
 La operación del controlador GPC MIMO en cada instante de muestreo se resume en el diagrama de flujo de la Figura 3.X. El procedimiento se inicia con una etapa de configuración fuera de línea, en la cual se calculan los coeficientes de respuesta al escalón, la matriz dinámica **G**, las matrices de ponderación **Q** y **R**, el Hessiano **H** y la matriz de restricciones **A_ineq**. Posteriormente, en el lazo de control en tiempo real, se ejecuta secuencialmente la medición del estado, el cálculo de la respuesta libre **F**, la construcción del vector de referencia **W**, la actualización del vector lineal **f** y del lado derecho **b_ineq** de las restricciones, la resolución del problema QP y la aplicación del primer incremento de cada canal.
 

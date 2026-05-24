@@ -131,11 +131,11 @@ for i = 1:ny
 end
 
 %% ------------------------------------------------------------------------
-%  Salida para la TESIS - Tabla 3.1 y Figura 3.X de la seccion 3.3.2
+%  Salida para la TESIS - Tabla 3.2 y Figura 3.X de la seccion 3.3.3
 %  Muestra los coeficientes de respuesta al escalon g_ij[k] que conforman
 %  la matriz dinamica G.
 %  ------------------------------------------------------------------------
-fprintf('\n=== TABLA 3.1: Coeficientes de respuesta al escalon ===\n');
+fprintf('\n=== TABLA 3.2: Coeficientes de respuesta al escalon ===\n');
 fprintf('     Primeros 10 valores de g_ij[k]\n\n');
 T_g = table((1:10)', g_step{1,1}(1:10), g_step{1,2}(1:10), ...
                      g_step{2,1}(1:10), g_step{2,2}(1:10), ...
