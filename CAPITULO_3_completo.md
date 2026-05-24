@@ -22,6 +22,8 @@ A diferencia de los trabajos antecedentes desarrollados sobre la misma planta pi
 
 El capítulo se estructura como sigue. En la sección 3.2 se definen los criterios de desempeño utilizados a lo largo del trabajo. En la sección 3.3 se desarrolla el diseño del controlador GPC MIMO, incluyendo su formulación matricial, el tratamiento de restricciones y la trayectoria de referencia. En la sección 3.4 se presentan y comparan los métodos de sintonización considerados y se selecciona el más adecuado. En la sección 3.5 se sintetizan las ecuaciones finales del controlador y se describe su implementación. Finalmente, en la sección 3.6 se exponen las conclusiones del capítulo.
 
+**Nota sobre la notación.** En este capítulo se mantiene la convención introducida en la sección 2.2.4: `N` denota la longitud del horizonte de predicción (equivalente a `N₂` del capítulo 2 bajo la simplificación `N₁ = 1`, válida por la ausencia de tiempo muerto en el sistema), `N_u` denota el horizonte de control (equivalente a `Nu`), y `n_u, n_y` indican el número de entradas y salidas físicas del proceso (en este caso `n_u = n_y = 2`). Las dimensiones de matrices y vectores se expresan como `(filas) × (columnas)`, donde `× 1` corresponde a un vector columna.
+
 ---
 
 ## 3.2 Criterios de desempeño
