@@ -14,13 +14,13 @@
 
 ## 3.1 Introducción
 
-El presente capítulo aborda el diseño del controlador predictivo generalizado en su versión multivariable (GPC MIMO) aplicado al sistema hidráulico de cuatro tanques acoplados descrito en el Capítulo 2. A partir del modelo linealizado obtenido alrededor del punto de operación, se desarrolla la formulación matricial completa del controlador, incluyendo el tratamiento explícito de las restricciones físicas sobre los actuadores mediante una formulación de programación cuadrática (QP) y la incorporación de una trayectoria de referencia suavizada para mejorar el comportamiento dinámico ante cambios de consigna.
+El presente capítulo aborda el diseño del controlador predictivo generalizado en su versión multivariable (GPC MIMO) aplicado al sistema hidráulico de cuatro tanques acoplados descrito en el Capítulo 2. A partir del modelo linealizado obtenido alrededor del punto de operación, se desarrolla la formulación matricial completa del controlador, incluyendo el tratamiento explícito de las restricciones físicas sobre los actuadores mediante una formulación de programación cuadrática (QP).
 
 Una vez construida la estructura del controlador, se aborda el problema de la sintonización de sus parámetros —tiempo de muestreo, horizontes de predicción y control, y matrices de ponderación— mediante la comparación sistemática de cuatro métodos representativos, uno por cada familia metodológica: el método heurístico-analítico de Clarke-Mohtadi, el método analítico explícito de Shridhar-Cooper extendido al caso multivariable, el algoritmo metaheurístico global de Optimización por Enjambre de Partículas (PSO) y el método de optimización numérica directa de Nelder-Mead implementado en `fminsearch`. La elección del método más adecuado para esta aplicación se realiza mediante un análisis cuantitativo basado en seis criterios de desempeño previamente definidos.
 
-A diferencia de los trabajos antecedentes desarrollados sobre la misma planta piloto —entre ellos la tesis de licenciatura de Oré Sánchez [pendiente encontrar fuente] sobre control DMC en una configuración de dos tanques y la tesis de maestría de Sánchez Zurita [10] sobre control DMC y DMPC en cuatro tanques— la presente investigación se diferencia en tres aspectos fundamentales: primero, en el uso de la formulación CARIMA con ecuaciones diofánticas característica del GPC, distinta a la matriz dinámica de respuesta al escalón empleada por el DMC y la representación en espacio de estados utilizada por el DMPC; segundo, en la comparación de cuatro métodos formales de sintonización —uno por cada familia metodológica— validados mediante una métrica combinada de seis indicadores de desempeño; y tercero, en la incorporación explícita de una trayectoria de referencia exponencial que mejora el comportamiento dinámico sin requerir un reajuste agresivo de los pesos de la función de costo.
+A diferencia de los trabajos antecedentes desarrollados sobre la misma planta piloto —entre ellos la tesis de licenciatura de Oré Sánchez [pendiente encontrar fuente] sobre control DMC en una configuración de dos tanques y la tesis de maestría de Sánchez Zurita [10] sobre control DMC y DMPC en cuatro tanques— la presente investigación se diferencia en dos aspectos fundamentales: primero, en el uso de la formulación CARIMA con ecuaciones diofánticas característica del GPC, distinta a la matriz dinámica de respuesta al escalón empleada por el DMC y la representación en espacio de estados utilizada por el DMPC; y segundo, en la comparación de cuatro métodos formales de sintonización —uno por cada familia metodológica— validados mediante una métrica combinada de seis indicadores de desempeño.
 
-El capítulo se estructura como sigue. En la sección 3.2 se definen los criterios de desempeño utilizados a lo largo del trabajo. En la sección 3.3 se desarrolla el diseño del controlador GPC MIMO, incluyendo su formulación matricial, el tratamiento de restricciones y la trayectoria de referencia. En la sección 3.4 se presentan y comparan los métodos de sintonización considerados y se selecciona el más adecuado. En la sección 3.5 se sintetizan las ecuaciones finales del controlador y se describe su implementación. Finalmente, en la sección 3.6 se exponen las conclusiones del capítulo.
+El capítulo se estructura como sigue. En la sección 3.2 se definen los criterios de desempeño utilizados a lo largo del trabajo. En la sección 3.3 se desarrolla el diseño del controlador GPC MIMO, incluyendo su formulación matricial, el tratamiento de restricciones y la construcción del vector de referencia. En la sección 3.4 se presentan y comparan los métodos de sintonización considerados y se selecciona el más adecuado. En la sección 3.5 se sintetizan las ecuaciones finales del controlador y se describe su implementación. Finalmente, en la sección 3.6 se exponen las conclusiones del capítulo.
 
 **Nota sobre la notación.** En este capítulo se mantiene la convención introducida en la sección 2.2.4: `N` denota la longitud del horizonte de predicción (equivalente a `N₂` del capítulo 2 bajo la simplificación `N₁ = 1`, válida por la ausencia de tiempo muerto en el sistema), `N_u` denota el horizonte de control (equivalente a `Nu`), y `n_u, n_y` indican el número de entradas y salidas físicas del proceso (en este caso `n_u = n_y = 2`). Las dimensiones de matrices y vectores se expresan como `(filas) × (columnas)`, donde `× 1` corresponde a un vector columna.
 
@@ -255,7 +255,7 @@ $$ J = (\hat{\mathbf{Y}} - \mathbf{W})^{T}\,\mathbf{Q}\,(\hat{\mathbf{Y}} - \mat
 J = (\hat{\mathbf{Y}} - \mathbf{W})^{T}\,\mathbf{Q}\,(\hat{\mathbf{Y}} - \mathbf{W}) + \Delta\mathbf{U}^{T}\,\mathbf{R}\,\Delta\mathbf{U}
 ```
 
-donde **Q** es la matriz bloque-diagonal de ponderación del error de seguimiento, formada por `N` copias de la matriz `diag(δ₁, δ₂)`, y **R** es la matriz bloque-diagonal de ponderación del esfuerzo de control, formada por `N_u` copias de la matriz `diag(λ₁, λ₂)`. El vector **W** contiene los valores futuros de la referencia, los cuales se construyen según la trayectoria de referencia descrita en la sección 3.3.3.
+donde **Q** es la matriz bloque-diagonal de ponderación del error de seguimiento, formada por `N` copias de la matriz `diag(δ₁, δ₂)`, y **R** es la matriz bloque-diagonal de ponderación del esfuerzo de control, formada por `N_u` copias de la matriz `diag(λ₁, λ₂)`. El vector **W** contiene los valores futuros de la referencia, los cuales se construyen conforme se describe en la sección 3.3.3.
 
 Al sustituir la ecuación de predicción en la función de costo y reorganizar términos, se obtiene una forma cuadrática en la variable de decisión `ΔU`:
 
@@ -395,23 +395,21 @@ $$ \text{s.a.}\quad \mathbf{A}_{ineq}\,\Delta\mathbf{U} \le \mathbf{b}_{ineq} $$
 
 Este problema se resuelve mediante el algoritmo `quadprog` de MATLAB, basado en métodos de punto interior, cuya convergencia está garantizada por la convexidad del problema [pendiente encontrar fuente]. Es importante destacar que la matriz **H** es constante a lo largo de toda la simulación y puede calcularse una sola vez fuera del bucle de control, mientras que el vector **f** y el lado derecho de las restricciones **b_ineq** se actualizan en cada iteración con los nuevos valores del estado y del control previo.
 
-### 3.3.3 Trayectoria de referencia
+### 3.3.3 Construcción del vector de referencia futura
 
-Aunque el controlador GPC dispone naturalmente de información sobre la referencia futura cuando ésta es conocida, en aplicaciones donde el operador puede modificar el setpoint en cualquier momento resulta más realista asumir que el controlador conoce únicamente la referencia actual. Para suavizar la respuesta y evitar acciones de control bruscas ante cambios escalón, se introduce una **trayectoria de referencia exponencial** [pendiente encontrar fuente], la cual define cómo se persigue el setpoint a lo largo del horizonte de predicción:
+Aunque el controlador GPC dispone naturalmente de información sobre la referencia futura cuando ésta es conocida, en aplicaciones donde el operador puede modificar el setpoint en cualquier momento resulta más realista asumir que el controlador conoce únicamente la referencia actual. Por esta razón, en la presente formulación el vector de referencia futura se construye asumiendo que el setpoint permanece constante a lo largo del horizonte de predicción:
 
 **Preview:**
 
-$$ \mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k),\quad j = 1, 2, \ldots, N $$
+$$ \mathbf{w}(k+j) = \mathbf{r}(k),\quad j = 1, 2, \ldots, N $$
 
 **LaTeX para Word:**
 
 ```latex
-\mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k),\quad j = 1, 2, \ldots, N
+\mathbf{w}(k+j) = \mathbf{r}(k),\quad j = 1, 2, \ldots, N
 ```
 
-donde `r(k)` es el setpoint actual, `y(k)` es la salida medida en el instante presente y `α ∈ [0, 1]` es el factor de suavizado. Para `α = 0` se persigue el setpoint de manera inmediata, lo cual puede generar sobrepicos en sistemas con dinámica acoplada; para `α = 1` la trayectoria nunca alcanza el setpoint; valores intermedios producen una transición suave entre el estado actual y el deseado. En esta tesis se adopta el valor `α = 0.7` como compromiso entre velocidad de respuesta y suavidad del control.
-
-La incorporación de esta trayectoria es uno de los aspectos diferenciadores de la formulación propuesta respecto a las implementaciones de DMC reportadas en [10] y [pendiente encontrar fuente — tesis Oré Sánchez], donde la referencia futura se asume constante e igual al setpoint actual. Como se demostrará en el Capítulo 4, esta modificación reduce notablemente el sobrepico sin requerir un aumento de la matriz de ponderación **R**, lo cual mantiene la velocidad de respuesta del lazo.
+donde `r(k)` es el setpoint actual e `y(k)` es la salida medida en el instante presente. Esta elección refleja el principio físico de causalidad: ningún controlador real puede anticipar cambios futuros del setpoint que aún no han ocurrido, y la respuesta del sistema solo debe iniciarse cuando se introduce una excitación efectiva en su entrada.
 
 ### 3.3.4 Diagrama de flujo del controlador GPC
 
@@ -718,16 +716,16 @@ $$ \boldsymbol{\xi}(k) = \begin{bmatrix} \mathbf{x}(k) - \mathbf{x}(k-1) \\ \mat
 \boldsymbol{\xi}(k) = \begin{bmatrix} \mathbf{x}(k) - \mathbf{x}(k-1) \\ \mathbf{y}(k) - \mathbf{y}^{0} \end{bmatrix}
 ```
 
-b) Construcción del vector de referencia futura con trayectoria suavizada:
+b) Construcción del vector de referencia futura (setpoint constante en el horizonte):
 
 **Preview:**
 
-$$ \mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k) $$
+$$ \mathbf{w}(k+j) = \mathbf{r}(k) $$
 
 **LaTeX para Word:**
 
 ```latex
-\mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k)
+\mathbf{w}(k+j) = \mathbf{r}(k)
 ```
 
 c) Vector lineal del QP:
@@ -786,7 +784,7 @@ La implementación completa del controlador GPC MIMO se ha realizado en MATLAB, 
 
 ## 3.6 Conclusiones del capítulo
 
-En el presente capítulo se ha desarrollado el diseño completo del controlador predictivo generalizado en su versión multivariable aplicado al sistema hidráulico de cuatro tanques acoplados. A partir del modelo lineal obtenido en el Capítulo 2, se construyó la formulación matricial del controlador mediante un modelo aumentado en incrementos de control, lo cual incorpora de manera natural la acción integral necesaria para garantizar error nulo en estado estacionario. La inclusión explícita de restricciones físicas mediante una formulación de programación cuadrática (QP) y la incorporación de una trayectoria de referencia exponencial permiten que el controlador respete los límites operacionales del sistema y produzca respuestas suaves ante cambios de consigna, dos aspectos que diferencian la presente formulación respecto a las implementaciones de DMC previamente reportadas sobre la misma planta piloto.
+En el presente capítulo se ha desarrollado el diseño completo del controlador predictivo generalizado en su versión multivariable aplicado al sistema hidráulico de cuatro tanques acoplados. A partir del modelo lineal obtenido en el Capítulo 2, se construyó la formulación matricial del controlador mediante un modelo aumentado en incrementos de control, lo cual incorpora de manera natural la acción integral necesaria para garantizar error nulo en estado estacionario. La inclusión explícita de restricciones físicas mediante una formulación de programación cuadrática (QP) permite además que el controlador respete los límites operacionales del sistema, aspecto que diferencia la presente formulación respecto a las implementaciones de DMC previamente reportadas sobre la misma planta piloto.
 
 El diseño del controlador se ha complementado con un análisis riguroso del problema de sintonización, en el cual se han aplicado y comparado cuatro métodos representativos de las cuatro familias metodológicas reconocidas en la literatura: el método heurístico-analítico de Clarke-Mohtadi, el método analítico explícito de Shridhar-Cooper extendido al caso multivariable, el algoritmo metaheurístico global de Optimización por Enjambre de Partículas (PSO) y el método de optimización numérica directa de Nelder-Mead implementado en `fminsearch`. La comparación se ha realizado mediante un score combinado que pondera seis criterios de desempeño —sobrepico, tiempo de establecimiento, IAE, ISE, ITAE y esfuerzo de control— lo cual proporciona una evaluación objetiva y reproducible. El método con menor score combinado se ha adoptado como sintonización final del controlador para las pruebas del Capítulo 4.
 

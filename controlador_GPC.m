@@ -259,21 +259,6 @@ ref = zeros(ny, N_steps);
 ref(:,1:round(500/Ts))     = repmat([25; 25], 1, round(500/Ts));      % inicial
 ref(:,round(500/Ts)+1:end) = repmat([30; 20], 1, N_steps - round(500/Ts));  % nuevo SP
 
-% ---------- TRAYECTORIA DE REFERENCIA (suavizado del setpoint) ----------
-% Para evitar sobreimpulso, no se persigue el setpoint de golpe sino una
-% trayectoria suave hacia el. En cada instante k se construye:
-%
-%     w(k+j) = alpha^j * y(k) + (1 - alpha^j) * r(k+j)
-%
-% donde alpha en [0,1] es el factor de suavizado:
-%   alpha = 0     -> sin filtro (perseguir el setpoint inmediato)
-%   alpha = 0.7   -> suavizado moderado (recomendado para tu sistema)
-%   alpha cerca 1 -> trayectoria muy lenta (puede no llegar a tiempo)
-%
-% Esta tecnica reduce drasticamente el sobreimpulso sin sacrificar mucho
-% tiempo de establecimiento, y NO requiere cambiar lambda.
-alpha = 0.7;
-
 % Inicializacion
 h_real    = h0;                % planta NO lineal arranca en el punto de operacion
 u_actual  = [u10; u20];        % entrada actual = entrada estacionaria
@@ -305,21 +290,12 @@ for k = 1:N_steps-1
     y_lin     = Cd*x_lin;                       % y en desviacion
     xi        = [Dx_lin; y_lin];                % estado aumentado
 
-    % ---- (2) Vector de referencia futuro CON TRAYECTORIA SUAVIZADA -----
-    % Filtro: w(k+j) = alpha^j * y(k) + (1-alpha^j) * r(k)
-    %
-    % IMPORTANTE: usamos r(k) (setpoint ACTUAL), NO r(k+j) (futuro).
-    % Esto elimina la "anticipacion" del controlador: no sabra del cambio
-    % hasta que efectivamente ocurra. Es el caso realista en plantas
-    % industriales y es como se comporta el DMC clasico.
-    y_actual_dev = h_real(3:4) - [h30; h40];      % salida actual en desviacion
-    r_actual_dev = ref(:,k) - [h30; h40];         % setpoint ACTUAL en desviacion
-    W = zeros(N*ny,1);
-    for j = 1:N
-        % Trayectoria suavizada hacia el setpoint actual (sin preview)
-        w_j = alpha^j * y_actual_dev + (1 - alpha^j) * r_actual_dev;
-        W((j-1)*ny+1:j*ny) = w_j;
-    end
+    % ---- (2) Vector de referencia futuro (sin preview del setpoint) -----
+    % Se usa r(k) (setpoint ACTUAL), NO r(k+j) (futuro). Esto elimina la
+    % "anticipacion" del controlador: no sabra del cambio hasta que
+    % efectivamente ocurra. Es el caso realista en plantas industriales.
+    r_actual_dev = ref(:,k) - [h30; h40];      % setpoint ACTUAL en desviacion
+    W = repmat(r_actual_dev, N, 1);            % constante en todo el horizonte
 
     % ---- (3) Construir restricciones que dependen de u_prev -------------
     %   u_prev en desviacion (porque trabajamos con el modelo lineal)
