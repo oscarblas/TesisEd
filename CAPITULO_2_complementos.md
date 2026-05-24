@@ -1,14 +1,18 @@
 # COMPLEMENTOS PARA CAPÍTULO 2
 
-> Este archivo contiene las **dos secciones faltantes** del Capítulo 2 que debes agregar a tu `TESIS_20212444.docx`:
+> Este archivo contiene las **dos secciones faltantes** del Capítulo 2:
 > - Sección **2.2.4 — GPC en sistemas multivariables** (va después de la sección 2.2.3)
 > - Sección **2.4 — Simulación del modelo** (va al final del capítulo 2, antes de las conclusiones)
 >
 > **Cómo usar este archivo:**
-> 1. Copia cada párrafo en Word.
-> 2. Para cada fórmula, usa `Insertar → Ecuación → modo LaTeX`, pega el código LaTeX (sin los símbolos `$`) y presiona Enter.
-> 3. Las figuras marcadas con `[INSERTAR FIGURA...]` debes generarlas con los scripts MATLAB indicados.
-> 4. Las fuentes marcadas como `["pendiente encontrar fuente"]` debes buscarlas y agregarlas a tu bibliografía.
+> 1. Copia el texto en Word.
+> 2. Para cada fórmula tienes **dos cosas**: el **preview renderizado** (lo que se debe ver) y el **código LaTeX** para pegar en Word usando `Insertar → Ecuación → modo LaTeX`.
+> 3. Si una fórmula no funciona en Word, toma captura del preview y continúa.
+>
+> **Reglas aplicadas a todas las fórmulas:**
+> - Cada fórmula en **una sola línea** de código (los `\\` adentro son separadores de fila de matrices)
+> - **`\|...\|`** simple en vez de `\left\|...\right\|`
+> - **`\bar{X}`** en vez de `\overline{X}`
 
 ---
 
@@ -18,6 +22,12 @@ En las secciones anteriores se introdujo el Control Predictivo Generalizado para
 
 Considerando un sistema con `n_u` entradas y `n_y` salidas, la representación CARIMA del proceso se generaliza al caso matricial mediante polinomios cuyos coeficientes son matrices. La ecuación del modelo en el operador de desplazamiento hacia atrás `z⁻¹` toma la forma:
 
+**Preview:**
+
+$$ \mathbf{A}(z^{-1})\,\mathbf{y}(t) = \mathbf{B}(z^{-1})\,\mathbf{u}(t-1) + \frac{\mathbf{C}(z^{-1})}{\Delta}\,\mathbf{e}(t) $$
+
+**LaTeX para Word:**
+
 ```latex
 \mathbf{A}(z^{-1})\,\mathbf{y}(t) = \mathbf{B}(z^{-1})\,\mathbf{u}(t-1) + \frac{\mathbf{C}(z^{-1})}{\Delta}\,\mathbf{e}(t)
 ```
@@ -26,6 +36,12 @@ donde **y**(t) es el vector de salidas de dimensión `n_y × 1`, **u**(t) es el 
 
 Análogamente al caso SISO, la predicción de las salidas futuras se obtiene resolviendo un conjunto de ecuaciones diofánticas matriciales. Para cada paso `j` dentro del horizonte de predicción, se cumple la identidad:
 
+**Preview:**
+
+$$ \mathbf{I} = \mathbf{E}_j(z^{-1})\,\tilde{\mathbf{A}}(z^{-1}) + z^{-j}\,\mathbf{F}_j(z^{-1}) $$
+
+**LaTeX para Word:**
+
 ```latex
 \mathbf{I} = \mathbf{E}_j(z^{-1})\,\tilde{\mathbf{A}}(z^{-1}) + z^{-j}\,\mathbf{F}_j(z^{-1})
 ```
@@ -33,6 +49,12 @@ Análogamente al caso SISO, la predicción de las salidas futuras se obtiene res
 donde `Ã(z⁻¹) = Δ·A(z⁻¹)` y las matrices **E_j** y **F_j** se obtienen recursivamente. Esta formulación permite expresar la predicción óptima a `j` pasos como una combinación lineal entre los incrementos de control futuros y la información disponible al instante actual.
 
 Aplicando el principio de superposición —válido por la linealidad del modelo— la predicción de cada salida `y_r(t+j)` con `r = 1, …, n_y` se construye como la suma de las contribuciones individuales de cada entrada `u_s(t)` con `s = 1, …, n_u`. En forma matricial compacta, el vector de predicciones futuras se escribe como:
+
+**Preview:**
+
+$$ \hat{\mathbf{Y}} = \mathbf{G}\,\Delta\mathbf{U} + \mathbf{f} $$
+
+**LaTeX para Word:**
 
 ```latex
 \hat{\mathbf{Y}} = \mathbf{G}\,\Delta\mathbf{U} + \mathbf{f}
@@ -47,26 +69,39 @@ donde:
 
 La matriz dinámica multivariable presenta una estructura por bloques que refleja la interacción entre todas las entradas y salidas del proceso:
 
+**Preview:**
+
+$$ \mathbf{G} = \begin{bmatrix} \mathbf{G}_{11} & \mathbf{G}_{12} & \cdots & \mathbf{G}_{1n_u} \\ \mathbf{G}_{21} & \mathbf{G}_{22} & \cdots & \mathbf{G}_{2n_u} \\ \vdots & \vdots & \ddots & \vdots \\ \mathbf{G}_{n_y 1} & \mathbf{G}_{n_y 2} & \cdots & \mathbf{G}_{n_y n_u} \end{bmatrix} $$
+
+**LaTeX para Word (todo en una sola línea):**
+
 ```latex
-\mathbf{G} = \begin{bmatrix}
-\mathbf{G}_{11} & \mathbf{G}_{12} & \cdots & \mathbf{G}_{1n_u} \\
-\mathbf{G}_{21} & \mathbf{G}_{22} & \cdots & \mathbf{G}_{2n_u} \\
-\vdots & \vdots & \ddots & \vdots \\
-\mathbf{G}_{n_y 1} & \mathbf{G}_{n_y 2} & \cdots & \mathbf{G}_{n_y n_u}
-\end{bmatrix}
+\mathbf{G} = \begin{bmatrix} \mathbf{G}_{11} & \mathbf{G}_{12} & \cdots & \mathbf{G}_{1n_u} \\ \mathbf{G}_{21} & \mathbf{G}_{22} & \cdots & \mathbf{G}_{2n_u} \\ \vdots & \vdots & \ddots & \vdots \\ \mathbf{G}_{n_y 1} & \mathbf{G}_{n_y 2} & \cdots & \mathbf{G}_{n_y n_u} \end{bmatrix}
 ```
 
 Cada submatriz **G_{rs}** es triangular inferior y contiene los coeficientes de la respuesta dinámica de la salida `r` frente a un incremento de la entrada `s`. La dimensión de cada submatriz es `N × N_u`, donde `N` corresponde al horizonte de predicción y `N_u` al horizonte de control.
 
 En lo que respecta a la función de costo, su extensión al caso multivariable se realiza incorporando matrices de ponderación que permitan asignar pesos diferentes a cada salida controlada y a cada entrada manipulada. La función de costo queda definida como:
 
+**Preview:**
+
+$$ J = \sum_{j=N_1}^{N_2} \| \hat{\mathbf{y}}(t+j|t) - \mathbf{w}(t+j) \|_{\boldsymbol{\delta}}^{2} + \sum_{j=1}^{N_u} \| \Delta\mathbf{u}(t+j-1) \|_{\boldsymbol{\lambda}}^{2} $$
+
+**LaTeX para Word:**
+
 ```latex
-J = \sum_{j=N_1}^{N_2} \left\| \hat{\mathbf{y}}(t+j|t) - \mathbf{w}(t+j) \right\|_{\boldsymbol{\delta}}^{2} + \sum_{j=1}^{N_u} \left\| \Delta\mathbf{u}(t+j-1) \right\|_{\boldsymbol{\lambda}}^{2}
+J = \sum_{j=N_1}^{N_2} \| \hat{\mathbf{y}}(t+j|t) - \mathbf{w}(t+j) \|_{\boldsymbol{\delta}}^{2} + \sum_{j=1}^{N_u} \| \Delta\mathbf{u}(t+j-1) \|_{\boldsymbol{\lambda}}^{2}
 ```
 
 donde **δ** es la matriz diagonal de ponderación del error de seguimiento, de dimensión `n_y × n_y`, y **λ** es la matriz diagonal de ponderación del esfuerzo de control, de dimensión `n_u × n_u`. La notación `||·||²_M` representa la norma cuadrática ponderada por la matriz **M**.
 
 Esta función de costo puede escribirse en forma matricial compacta como:
+
+**Preview:**
+
+$$ J = (\hat{\mathbf{Y}} - \mathbf{W})^{T}\,\mathbf{Q}\,(\hat{\mathbf{Y}} - \mathbf{W}) + \Delta\mathbf{U}^{T}\,\mathbf{R}\,\Delta\mathbf{U} $$
+
+**LaTeX para Word:**
 
 ```latex
 J = (\hat{\mathbf{Y}} - \mathbf{W})^{T}\,\mathbf{Q}\,(\hat{\mathbf{Y}} - \mathbf{W}) + \Delta\mathbf{U}^{T}\,\mathbf{R}\,\Delta\mathbf{U}
@@ -75,6 +110,12 @@ J = (\hat{\mathbf{Y}} - \mathbf{W})^{T}\,\mathbf{Q}\,(\hat{\mathbf{Y}} - \mathbf
 donde **Q** = bloque-diagonal de **δ** repetido `N` veces, y **R** = bloque-diagonal de **λ** repetido `N_u` veces. El vector **W** contiene los valores futuros de referencia.
 
 Al sustituir la expresión de la predicción **Ŷ = GΔU + f** en la función de costo y aplicar la condición de optimalidad `∂J/∂(ΔU) = 0`, se obtiene la ley de control óptima en su forma analítica sin restricciones:
+
+**Preview:**
+
+$$ \Delta\mathbf{U}^{*} = (\mathbf{G}^{T}\mathbf{Q}\,\mathbf{G} + \mathbf{R})^{-1}\,\mathbf{G}^{T}\mathbf{Q}\,(\mathbf{W} - \mathbf{f}) $$
+
+**LaTeX para Word:**
 
 ```latex
 \Delta\mathbf{U}^{*} = (\mathbf{G}^{T}\mathbf{Q}\,\mathbf{G} + \mathbf{R})^{-1}\,\mathbf{G}^{T}\mathbf{Q}\,(\mathbf{W} - \mathbf{f})
@@ -121,8 +162,14 @@ Para el modelo lineal, dado que opera con variables desviadas respecto al punto 
 
 Para cuantificar la fidelidad del modelo linealizado respecto al modelo no lineal se ha empleado el índice de bondad de ajuste FIT, definido como [10]:
 
+**Preview:**
+
+$$ \text{FIT}_i\,(\%) = 100 \cdot \left( 1 - \frac{\| \mathbf{h}_i^{NL} - \mathbf{h}_i^{L} \|}{\| \mathbf{h}_i^{NL} - \bar{\mathbf{h}}_i^{NL} \|} \right) $$
+
+**LaTeX para Word:**
+
 ```latex
-\text{FIT}_i\,(\%) = 100 \cdot \left( 1 - \frac{\| \mathbf{h}_i^{\text{NL}} - \mathbf{h}_i^{\text{L}} \|}{\| \mathbf{h}_i^{\text{NL}} - \overline{\mathbf{h}_i^{\text{NL}}} \|} \right)
+\text{FIT}_i\,(\%) = 100 \cdot \left( 1 - \frac{\| \mathbf{h}_i^{NL} - \mathbf{h}_i^{L} \|}{\| \mathbf{h}_i^{NL} - \bar{\mathbf{h}}_i^{NL} \|} \right)
 ```
 
 donde `h_i^NL` es el vector de respuestas del modelo no lineal para el tanque `i`, `h_i^L` es la correspondiente respuesta del modelo lineal, y la barra superior denota el promedio temporal de la señal. Un valor de FIT cercano al 100% indica una correspondencia casi exacta entre ambos modelos, mientras que valores cercanos a cero o negativos indican una pobre representación lineal de la dinámica.

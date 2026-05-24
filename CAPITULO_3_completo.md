@@ -1,12 +1,14 @@
 # CAPÍTULO 3 — Diseño del Controlador Predictivo GPC para el Sistema Hidráulico de Cuatro Tanques Acoplados (TITO)
 
 > **Instrucciones de uso:**
-> - Copia cada sección en Word.
-> - Para cada fórmula, usa `Insertar → Ecuación → modo LaTeX`, pega el código (sin los símbolos `$`) y presiona Enter.
-> - Las figuras `[INSERTAR FIGURA...]` se generan con los scripts MATLAB del repositorio.
-> - Las tablas se construyen en Word con los datos indicados.
-> - Las fuentes marcadas como `["pendiente encontrar fuente"]` debes buscarlas y agregarlas a la bibliografía.
-> - **Estructura del capítulo modificada** respecto a tu índice original para evitar numeración repetida (3.3.4 dos veces) y mejorar la hilación: el orden es **diseño → sintonización → comparación → resumen**.
+> - Para cada fórmula tienes el **preview renderizado** (lo que se debe ver) y el **código LaTeX** para Word.
+> - Pega el código en Word con `Insertar → Ecuación → modo LaTeX`.
+> - Si una fórmula no funciona en Word, **toma captura del preview** y continúa.
+>
+> **Reglas aplicadas a todas las fórmulas:**
+> - Cada fórmula en **una sola línea** de código LaTeX
+> - **`\|...\|`** en vez de `\left\|...\right\|`
+> - **`\bar{X}`** en vez de `\overline{X}`
 
 ---
 
@@ -30,16 +32,28 @@ Para evaluar de manera objetiva y reproducible el comportamiento del controlador
 
 El **sobrepico** o sobreimpulso, denotado como `M_p`, se define como la diferencia porcentual entre el valor máximo alcanzado por la salida y el valor de referencia deseado, expresado en relación a la amplitud del cambio de consigna [pendiente encontrar fuente]. Matemáticamente:
 
+**Preview:**
+
+$$ M_p\,(\%) = \frac{\max\{ y(t) \} - y_{ref}}{y_{ref} - y_0} \cdot 100\% $$
+
+**LaTeX para Word:**
+
 ```latex
-M_p\,(\%) = \frac{\max\{ y(t) \} - y_{\text{ref}}}{y_{\text{ref}} - y_0} \cdot 100\%
+M_p\,(\%) = \frac{\max\{ y(t) \} - y_{ref}}{y_{ref} - y_0} \cdot 100\%
 ```
 
 donde `y₀` es el valor inicial de la salida e `y_ref` es el valor de referencia. En el contexto del control de nivel, un sobrepico elevado puede ocasionar desbordamientos en los tanques o esfuerzos innecesarios en las bombas, por lo que es deseable que este indicador sea lo más bajo posible.
 
 El **tiempo de establecimiento** `t_s` se define como el instante a partir del cual la salida permanece dentro de una banda de tolerancia alrededor del valor de referencia. En esta tesis se adopta el criterio estándar del 2%, de modo que:
 
+**Preview:**
+
+$$ t_s = \min\{ t^{*} \mid | y(t) - y_{ref} | \le 0.02 \cdot |y_{ref} - y_0|,\ \forall\,t \ge t^{*} \} $$
+
+**LaTeX para Word:**
+
 ```latex
-t_s = \min\{ t^{*} \mid \left| y(t) - y_{\text{ref}} \right| \le 0.02 \cdot |y_{\text{ref}} - y_0|,\ \forall\,t \ge t^{*} \}
+t_s = \min\{ t^{*} \mid | y(t) - y_{ref} | \le 0.02 \cdot |y_{ref} - y_0|,\ \forall\,t \ge t^{*} \}
 ```
 
 Este indicador caracteriza la rapidez del lazo cerrado y es uno de los más relevantes desde el punto de vista operativo, ya que determina el tiempo en el cual el sistema alcanza una condición estable luego de una perturbación o un cambio de consigna.
@@ -50,28 +64,52 @@ Los criterios anteriores caracterizan aspectos puntuales de la respuesta, pero n
 
 La **Integral del Error Absoluto (IAE)** pondera de manera uniforme todos los errores a lo largo del horizonte de evaluación, sin importar su signo ni el instante en que ocurran:
 
+**Preview:**
+
+$$ \text{IAE} = \int_{0}^{T_{sim}} | e(t) |\, dt $$
+
+**LaTeX para Word:**
+
 ```latex
-\text{IAE} = \int_{0}^{T_{\text{sim}}} \left| e(t) \right| dt
+\text{IAE} = \int_{0}^{T_{sim}} | e(t) |\, dt
 ```
 
 donde `e(t) = y_ref(t) - y(t)` es el error de seguimiento. Este indicador es particularmente útil para evaluar el comportamiento promedio del controlador.
 
 La **Integral del Error Cuadrático (ISE)** penaliza con mayor fuerza los errores grandes debido a la elevación al cuadrado, lo cual la hace sensible a desviaciones transitorias amplias como las que se producen inmediatamente después de un cambio de consigna:
 
+**Preview:**
+
+$$ \text{ISE} = \int_{0}^{T_{sim}} e(t)^{2}\, dt $$
+
+**LaTeX para Word:**
+
 ```latex
-\text{ISE} = \int_{0}^{T_{\text{sim}}} e(t)^{2}\, dt
+\text{ISE} = \int_{0}^{T_{sim}} e(t)^{2}\, dt
 ```
 
 La **Integral del Error Absoluto Ponderado por el Tiempo (ITAE)** introduce el tiempo como factor multiplicativo, otorgando mayor peso a los errores que persisten en instantes tardíos de la simulación. Este criterio penaliza la lentitud del controlador y favorece sintonizaciones que alcanzan el régimen estacionario con rapidez:
 
+**Preview:**
+
+$$ \text{ITAE} = \int_{0}^{T_{sim}} t \cdot | e(t) |\, dt $$
+
+**LaTeX para Word:**
+
 ```latex
-\text{ITAE} = \int_{0}^{T_{\text{sim}}} t \cdot \left| e(t) \right| dt
+\text{ITAE} = \int_{0}^{T_{sim}} t \cdot | e(t) |\, dt
 ```
 
-En implementaciones digitales, donde la señal se discretiza con un período de muestreo `T_s`, las integrales anteriores se aproximan mediante sumas finitas a lo largo de los `N_{\text{sim}}` instantes de muestreo:
+En implementaciones digitales, donde la señal se discretiza con un período de muestreo `T_s`, las integrales anteriores se aproximan mediante sumas finitas a lo largo de los `N_{sim}` instantes de muestreo:
+
+**Preview:**
+
+$$ \text{IAE} \approx \sum_{k=0}^{N_{sim}-1} | e(k) | \cdot T_s $$
+
+**LaTeX para Word:**
 
 ```latex
-\text{IAE} \approx \sum_{k=0}^{N_{\text{sim}}-1} \left| e(k) \right| \cdot T_s
+\text{IAE} \approx \sum_{k=0}^{N_{sim}-1} | e(k) | \cdot T_s
 ```
 
 con expresiones análogas para ISE e ITAE.
@@ -80,15 +118,21 @@ con expresiones análogas para ISE e ITAE.
 
 La calidad de un controlador no se mide únicamente por su capacidad de seguimiento, sino también por la economía de la señal de control aplicada. Un controlador que minimiza el error a costa de movimientos bruscos y excesivos en los actuadores no es deseable, ya que incrementa el desgaste mecánico, el consumo energético y el riesgo de saturación. Para cuantificar este aspecto se emplea el **esfuerzo total de control**, definido como la variación total de la señal de control a lo largo del horizonte de simulación:
 
+**Preview:**
+
+$$ \Delta U_{total} = \sum_{k=1}^{N_{sim}-1} \| \mathbf{u}(k) - \mathbf{u}(k-1) \|_{1} $$
+
+**LaTeX para Word:**
+
 ```latex
-\Delta U_{\text{total}} = \sum_{k=1}^{N_{\text{sim}}-1} \left\| \mathbf{u}(k) - \mathbf{u}(k-1) \right\|_{1}
+\Delta U_{total} = \sum_{k=1}^{N_{sim}-1} \| \mathbf{u}(k) - \mathbf{u}(k-1) \|_{1}
 ```
 
 donde `||·||_1` denota la norma L1, que suma los valores absolutos de los incrementos en cada canal de entrada.
 
 Finalmente, el **costo computacional** se mide como el tiempo promedio de ejecución por iteración del algoritmo de control, medido en milisegundos mediante las primitivas `tic` y `toc` de MATLAB. Este indicador resulta crítico al considerar una eventual implementación en hardware industrial, donde los recursos de cómputo son limitados y el período de muestreo impone restricciones estrictas al tiempo disponible para resolver el problema de optimización en línea [10].
 
-> **Comentario para Edwin:** Esta sección 3.2 define los seis criterios que se usarán en toda la tesis. La tesis de maestría [10] usa cuatro (sobrepico, t_est, IAE, ISE) y agrega costo computacional. La tesis de licenciatura [pendiente encontrar fuente] usa IAE e ISE principalmente. Tu aporte diferenciador es la inclusión simultánea de los seis indicadores y el cálculo de un **score combinado** que se introducirá en la sección 3.4.5.
+> **Comentario para Edwin:** Esta sección 3.2 define los seis criterios que se usarán en toda la tesis. La tesis de maestría [10] usa cuatro (sobrepico, t_est, IAE, ISE) y agrega costo computacional. La tesis de licenciatura [pendiente encontrar fuente] usa IAE e ISE principalmente. Tu aporte diferenciador es la inclusión simultánea de los seis indicadores y el cálculo de un **score combinado** que se introducirá en la sección 3.4.6.
 
 ---
 
@@ -98,9 +142,21 @@ Finalmente, el **costo computacional** se mide como el tiempo promedio de ejecuc
 
 A partir del modelo linealizado en espacio de estados desarrollado en la sección 2.3.2, se inicia el diseño del controlador GPC discretizando dicho modelo con un período de muestreo `T_s` mediante un mantenedor de orden cero (ZOH). El modelo discreto resultante toma la forma:
 
+**Preview:**
+
+$$ \mathbf{x}(k+1) = \mathbf{A}_d\,\mathbf{x}(k) + \mathbf{B}_d\,\mathbf{u}(k) $$
+
+**LaTeX para Word:**
+
 ```latex
 \mathbf{x}(k+1) = \mathbf{A}_d\,\mathbf{x}(k) + \mathbf{B}_d\,\mathbf{u}(k)
 ```
+
+**Preview:**
+
+$$ \mathbf{y}(k) = \mathbf{C}_d\,\mathbf{x}(k) $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{y}(k) = \mathbf{C}_d\,\mathbf{x}(k)
@@ -110,15 +166,33 @@ donde `x ∈ ℝ⁴` representa el vector de estados (alturas de los cuatro tanq
 
 Para incorporar acción integral en el lazo cerrado y trabajar de manera consistente con el formalismo de incrementos de control del GPC, se construye un modelo aumentado tomando como variable de control el incremento `Δu(k) = u(k) - u(k-1)` y como vector de estados aumentado el par formado por el incremento de los estados originales y la salida actual:
 
+**Preview:**
+
+$$ \boldsymbol{\xi}(k) = \begin{bmatrix} \Delta\mathbf{x}(k) \\ \mathbf{y}(k) \end{bmatrix} $$
+
+**LaTeX para Word:**
+
 ```latex
 \boldsymbol{\xi}(k) = \begin{bmatrix} \Delta\mathbf{x}(k) \\ \mathbf{y}(k) \end{bmatrix}
 ```
 
 La dinámica del estado aumentado se expresa entonces como:
 
+**Preview:**
+
+$$ \boldsymbol{\xi}(k+1) = \tilde{\mathbf{A}}\,\boldsymbol{\xi}(k) + \tilde{\mathbf{B}}\,\Delta\mathbf{u}(k) $$
+
+**LaTeX para Word:**
+
 ```latex
 \boldsymbol{\xi}(k+1) = \tilde{\mathbf{A}}\,\boldsymbol{\xi}(k) + \tilde{\mathbf{B}}\,\Delta\mathbf{u}(k)
 ```
+
+**Preview:**
+
+$$ \mathbf{y}(k) = \tilde{\mathbf{C}}\,\boldsymbol{\xi}(k) $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{y}(k) = \tilde{\mathbf{C}}\,\boldsymbol{\xi}(k)
@@ -126,17 +200,35 @@ La dinámica del estado aumentado se expresa entonces como:
 
 donde las matrices aumentadas son:
 
+**Preview:**
+
+$$ \tilde{\mathbf{A}} = \begin{bmatrix} \mathbf{A}_d & \mathbf{0} \\ \mathbf{C}_d\,\mathbf{A}_d & \mathbf{I} \end{bmatrix},\quad \tilde{\mathbf{B}} = \begin{bmatrix} \mathbf{B}_d \\ \mathbf{C}_d\,\mathbf{B}_d \end{bmatrix},\quad \tilde{\mathbf{C}} = \begin{bmatrix} \mathbf{0} & \mathbf{I} \end{bmatrix} $$
+
+**LaTeX para Word (una sola línea):**
+
 ```latex
-\tilde{\mathbf{A}} = \begin{bmatrix} \mathbf{A}_d & \mathbf{0} \\ \mathbf{C}_d\,\mathbf{A}_d & \mathbf{I} \end{bmatrix}, \quad \tilde{\mathbf{B}} = \begin{bmatrix} \mathbf{B}_d \\ \mathbf{C}_d\,\mathbf{B}_d \end{bmatrix}, \quad \tilde{\mathbf{C}} = \begin{bmatrix} \mathbf{0} & \mathbf{I} \end{bmatrix}
+\tilde{\mathbf{A}} = \begin{bmatrix} \mathbf{A}_d & \mathbf{0} \\ \mathbf{C}_d\,\mathbf{A}_d & \mathbf{I} \end{bmatrix},\quad \tilde{\mathbf{B}} = \begin{bmatrix} \mathbf{B}_d \\ \mathbf{C}_d\,\mathbf{B}_d \end{bmatrix},\quad \tilde{\mathbf{C}} = \begin{bmatrix} \mathbf{0} & \mathbf{I} \end{bmatrix}
 ```
 
 A partir de este modelo aumentado, la predicción de la salida en el instante `k + j` se obtiene por recursión:
+
+**Preview:**
+
+$$ \hat{\mathbf{y}}(k+j \mid k) = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{j}\,\boldsymbol{\xi}(k) + \sum_{i=0}^{j-1} \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{\,j-i-1}\,\tilde{\mathbf{B}}\,\Delta\mathbf{u}(k+i) $$
+
+**LaTeX para Word:**
 
 ```latex
 \hat{\mathbf{y}}(k+j \mid k) = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{j}\,\boldsymbol{\xi}(k) + \sum_{i=0}^{j-1} \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{\,j-i-1}\,\tilde{\mathbf{B}}\,\Delta\mathbf{u}(k+i)
 ```
 
 Apilando las predicciones a lo largo del horizonte de predicción `N` y los incrementos de control a lo largo del horizonte de control `N_u`, se obtiene la forma matricial compacta:
+
+**Preview:**
+
+$$ \hat{\mathbf{Y}} = \mathbf{F}\,\boldsymbol{\xi}(k) + \boldsymbol{\Phi}\,\Delta\mathbf{U} $$
+
+**LaTeX para Word:**
 
 ```latex
 \hat{\mathbf{Y}} = \mathbf{F}\,\boldsymbol{\xi}(k) + \boldsymbol{\Phi}\,\Delta\mathbf{U}
@@ -151,6 +243,12 @@ donde:
 
 La función de costo cuadrática multivariable se escribe como:
 
+**Preview:**
+
+$$ J = (\hat{\mathbf{Y}} - \mathbf{W})^{T}\,\mathbf{Q}\,(\hat{\mathbf{Y}} - \mathbf{W}) + \Delta\mathbf{U}^{T}\,\mathbf{R}\,\Delta\mathbf{U} $$
+
+**LaTeX para Word:**
+
 ```latex
 J = (\hat{\mathbf{Y}} - \mathbf{W})^{T}\,\mathbf{Q}\,(\hat{\mathbf{Y}} - \mathbf{W}) + \Delta\mathbf{U}^{T}\,\mathbf{R}\,\Delta\mathbf{U}
 ```
@@ -159,21 +257,45 @@ donde **Q** es la matriz bloque-diagonal de ponderación del error de seguimient
 
 Al sustituir la ecuación de predicción en la función de costo y reorganizar términos, se obtiene una forma cuadrática en la variable de decisión `ΔU`:
 
+**Preview:**
+
+$$ J(\Delta\mathbf{U}) = \frac{1}{2}\,\Delta\mathbf{U}^{T}\,\mathbf{H}\,\Delta\mathbf{U} + \mathbf{f}^{T}\,\Delta\mathbf{U} + \text{cte} $$
+
+**LaTeX para Word:**
+
 ```latex
 J(\Delta\mathbf{U}) = \frac{1}{2}\,\Delta\mathbf{U}^{T}\,\mathbf{H}\,\Delta\mathbf{U} + \mathbf{f}^{T}\,\Delta\mathbf{U} + \text{cte}
 ```
 
 con:
 
+**Preview:**
+
+$$ \mathbf{H} = 2\,(\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,\boldsymbol{\Phi} + \mathbf{R}) $$
+
+**LaTeX para Word:**
+
 ```latex
 \mathbf{H} = 2\,(\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,\boldsymbol{\Phi} + \mathbf{R})
 ```
+
+**Preview:**
+
+$$ \mathbf{f} = -2\,\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,(\mathbf{W} - \mathbf{F}\,\boldsymbol{\xi}(k)) $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{f} = -2\,\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,(\mathbf{W} - \mathbf{F}\,\boldsymbol{\xi}(k))
 ```
 
 En ausencia de restricciones, la solución óptima se obtiene de manera analítica imponiendo `∂J/∂(ΔU) = 0`:
+
+**Preview:**
+
+$$ \Delta\mathbf{U}^{*} = (\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,\boldsymbol{\Phi} + \mathbf{R})^{-1}\,\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,(\mathbf{W} - \mathbf{F}\,\boldsymbol{\xi}(k)) $$
+
+**LaTeX para Word:**
 
 ```latex
 \Delta\mathbf{U}^{*} = (\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,\boldsymbol{\Phi} + \mathbf{R})^{-1}\,\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,(\mathbf{W} - \mathbf{F}\,\boldsymbol{\xi}(k))
@@ -187,19 +309,37 @@ El sistema de cuatro tanques acoplados presenta tres tipos de restricciones fís
 
 **1) Restricción sobre los incrementos de control:** los actuadores presentan una velocidad máxima de respuesta, lo que impone límites sobre la variación instantánea de la señal de control:
 
+**Preview:**
+
+$$ \Delta u_{min} \le \Delta u_s(k+i) \le \Delta u_{max},\quad i = 0, 1, \ldots, N_u - 1 $$
+
+**LaTeX para Word:**
+
 ```latex
-\Delta u_{\min} \le \Delta u_s(k+i) \le \Delta u_{\max}, \quad i = 0, 1, \ldots, N_u - 1
+\Delta u_{min} \le \Delta u_s(k+i) \le \Delta u_{max},\quad i = 0, 1, \ldots, N_u - 1
 ```
 
 **2) Restricción sobre los valores absolutos de la entrada:** las bombas operan dentro de un rango de voltajes acotado por consideraciones físicas y de seguridad:
 
+**Preview:**
+
+$$ u_{min} \le u_s(k+i) \le u_{max},\quad i = 0, 1, \ldots, N_u - 1 $$
+
+**LaTeX para Word:**
+
 ```latex
-u_{\min} \le u_s(k+i) \le u_{\max}, \quad i = 0, 1, \ldots, N_u - 1
+u_{min} \le u_s(k+i) \le u_{max},\quad i = 0, 1, \ldots, N_u - 1
 ```
 
 **3) Restricciones sobre las salidas (opcional):** los niveles de líquido están limitados por la altura física de los tanques, aunque en la presente formulación esta restricción se considera implícitamente al limitar las entradas.
 
 Las restricciones del tipo (1) son directas ya que `ΔU` es la variable de decisión del problema de optimización. Las restricciones del tipo (2), en cambio, requieren expresar el valor absoluto futuro de la entrada en función de los incrementos:
+
+**Preview:**
+
+$$ \mathbf{u}(k+i) = \mathbf{u}(k-1) + \sum_{j=0}^{i} \Delta\mathbf{u}(k+j) $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{u}(k+i) = \mathbf{u}(k-1) + \sum_{j=0}^{i} \Delta\mathbf{u}(k+j)
@@ -207,24 +347,48 @@ Las restricciones del tipo (1) son directas ya que `ΔU` es la variable de decis
 
 Apilando esta relación para los `N_u` instantes futuros, se obtiene la forma matricial:
 
+**Preview:**
+
+$$ \mathbf{U}_{fut} = \mathbf{T}\,\Delta\mathbf{U} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) $$
+
+**LaTeX para Word:**
+
 ```latex
-\mathbf{U}_{\text{fut}} = \mathbf{T}\,\Delta\mathbf{U} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1)
+\mathbf{U}_{fut} = \mathbf{T}\,\Delta\mathbf{U} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1)
 ```
 
 donde **T** es una matriz bloque-triangular inferior formada por bloques de identidad y **I** es una matriz apilada con `N_u` bloques de identidad. Con estas definiciones, el conjunto completo de restricciones lineales se escribe en la forma estándar `A_ineq · ΔU ≤ b_ineq`, donde:
 
+**Preview:**
+
+$$ \mathbf{A}_{ineq} = \begin{bmatrix} \mathbf{I} \\ -\mathbf{I} \\ \mathbf{T} \\ -\mathbf{T} \end{bmatrix},\quad \mathbf{b}_{ineq} = \begin{bmatrix} \Delta\mathbf{U}_{max} \\ -\Delta\mathbf{U}_{min} \\ \mathbf{U}_{max} - \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \\ -\mathbf{U}_{min} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \end{bmatrix} $$
+
+**LaTeX para Word (una sola línea):**
+
 ```latex
-\mathbf{A}_{\text{ineq}} = \begin{bmatrix} \mathbf{I} \\ -\mathbf{I} \\ \mathbf{T} \\ -\mathbf{T} \end{bmatrix}, \quad \mathbf{b}_{\text{ineq}} = \begin{bmatrix} \Delta\mathbf{U}_{\max} \\ -\Delta\mathbf{U}_{\min} \\ \mathbf{U}_{\max} - \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \\ -\mathbf{U}_{\min} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \end{bmatrix}
+\mathbf{A}_{ineq} = \begin{bmatrix} \mathbf{I} \\ -\mathbf{I} \\ \mathbf{T} \\ -\mathbf{T} \end{bmatrix},\quad \mathbf{b}_{ineq} = \begin{bmatrix} \Delta\mathbf{U}_{max} \\ -\Delta\mathbf{U}_{min} \\ \mathbf{U}_{max} - \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \\ -\mathbf{U}_{min} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \end{bmatrix}
 ```
 
 El problema de control resultante en cada instante de muestreo es un **problema de programación cuadrática (QP)** con función objetivo convexa y restricciones lineales:
+
+**Preview:**
+
+$$ \min_{\Delta\mathbf{U}}\ \frac{1}{2}\,\Delta\mathbf{U}^{T}\,\mathbf{H}\,\Delta\mathbf{U} + \mathbf{f}^{T}\,\Delta\mathbf{U} $$
+
+**LaTeX para Word:**
 
 ```latex
 \min_{\Delta\mathbf{U}}\ \frac{1}{2}\,\Delta\mathbf{U}^{T}\,\mathbf{H}\,\Delta\mathbf{U} + \mathbf{f}^{T}\,\Delta\mathbf{U}
 ```
 
+**Preview:**
+
+$$ \text{s.a.}\quad \mathbf{A}_{ineq}\,\Delta\mathbf{U} \le \mathbf{b}_{ineq} $$
+
+**LaTeX para Word:**
+
 ```latex
-\text{s.a.} \quad \mathbf{A}_{\text{ineq}}\,\Delta\mathbf{U} \le \mathbf{b}_{\text{ineq}}
+\text{s.a.}\quad \mathbf{A}_{ineq}\,\Delta\mathbf{U} \le \mathbf{b}_{ineq}
 ```
 
 Este problema se resuelve mediante el algoritmo `quadprog` de MATLAB, basado en métodos de punto interior, cuya convergencia está garantizada por la convexidad del problema [pendiente encontrar fuente]. Es importante destacar que la matriz **H** es constante a lo largo de toda la simulación y puede calcularse una sola vez fuera del bucle de control, mientras que el vector **f** y el lado derecho de las restricciones **b_ineq** se actualizan en cada iteración con los nuevos valores del estado y del control previo.
@@ -233,8 +397,14 @@ Este problema se resuelve mediante el algoritmo `quadprog` de MATLAB, basado en 
 
 Aunque el controlador GPC dispone naturalmente de información sobre la referencia futura cuando ésta es conocida, en aplicaciones donde el operador puede modificar el setpoint en cualquier momento resulta más realista asumir que el controlador conoce únicamente la referencia actual. Para suavizar la respuesta y evitar acciones de control bruscas ante cambios escalón, se introduce una **trayectoria de referencia exponencial** [pendiente encontrar fuente], la cual define cómo se persigue el setpoint a lo largo del horizonte de predicción:
 
+**Preview:**
+
+$$ \mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k),\quad j = 1, 2, \ldots, N $$
+
+**LaTeX para Word:**
+
 ```latex
-\mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k), \quad j = 1, 2, \ldots, N
+\mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k),\quad j = 1, 2, \ldots, N
 ```
 
 donde `r(k)` es el setpoint actual, `y(k)` es la salida medida en el instante presente y `α ∈ [0, 1]` es el factor de suavizado. Para `α = 0` se persigue el setpoint de manera inmediata, lo cual puede generar sobrepicos en sistemas con dinámica acoplada; para `α = 1` la trayectoria nunca alcanza el setpoint; valores intermedios producen una transición suave entre el estado actual y el deseado. En esta tesis se adopta el valor `α = 0.7` como compromiso entre velocidad de respuesta y suavidad del control.
@@ -280,8 +450,14 @@ Las reglas básicas del método se resumen como sigue:
 
 - **Horizonte de predicción:** se ajusta para cubrir aproximadamente el tiempo de subida del sistema en lazo abierto, calculado como:
 
+**Preview:**
+
+$$ N = \left\lceil \frac{2.2 \cdot \tau_{dom}}{T_s} \right\rceil $$
+
+**LaTeX para Word:**
+
 ```latex
-N = \left\lceil \frac{2.2 \cdot \tau_{\text{dom}}}{T_s} \right\rceil
+N = \left\lceil \frac{2.2 \cdot \tau_{dom}}{T_s} \right\rceil
 ```
 
 - **Horizonte de control:** se mantiene pequeño para favorecer la robustez, típicamente `N_u = 1` a `3`, evitando una excesiva flexibilidad que podría amplificar la sensibilidad al ruido de medición.
@@ -300,6 +476,12 @@ El procedimiento consta de los siguientes pasos:
 
 **Paso 1.** Aproximación de cada subproceso `(r, s)` —que relaciona la entrada `u_s` con la salida `y_r`— por un modelo FOPDT de la forma:
 
+**Preview:**
+
+$$ G_{rs}(s) = \frac{K_{rs}\,e^{-\theta_{rs}\,s}}{\tau_{rs}\,s + 1} $$
+
+**LaTeX para Word:**
+
 ```latex
 G_{rs}(s) = \frac{K_{rs}\,e^{-\theta_{rs}\,s}}{\tau_{rs}\,s + 1}
 ```
@@ -307,6 +489,12 @@ G_{rs}(s) = \frac{K_{rs}\,e^{-\theta_{rs}\,s}}{\tau_{rs}\,s + 1}
 donde `K_{rs}` es la ganancia estática, `τ_{rs}` la constante de tiempo y `θ_{rs}` el retardo de transporte. En el caso del sistema de cuatro tanques, los retardos son despreciables y se asume `θ_{rs} ≈ 0`.
 
 **Paso 2.** Selección del período de muestreo conforme a la regla:
+
+**Preview:**
+
+$$ T_s = \min\left( 0.1 \cdot \tau_{rs} \right) $$
+
+**LaTeX para Word:**
 
 ```latex
 T_s = \min\left( 0.1 \cdot \tau_{rs} \right)
@@ -316,6 +504,12 @@ aplicada sobre la mayor constante de tiempo de todos los pares entrada-salida.
 
 **Paso 3.** Cálculo del horizonte de predicción:
 
+**Preview:**
+
+$$ N = \max\left( \frac{5\,\tau_{rs}}{T_s} + 1 \right) $$
+
+**LaTeX para Word:**
+
 ```latex
 N = \max\left( \frac{5\,\tau_{rs}}{T_s} + 1 \right)
 ```
@@ -324,11 +518,23 @@ evaluado sobre las constantes de tiempo asociadas a las salidas controladas.
 
 **Paso 4.** Cálculo del horizonte de control como el 63.2% del tiempo de establecimiento del subproceso más lento:
 
+**Preview:**
+
+$$ N_u = \max\left( \frac{\tau_{rs}}{T_s} + 1 \right) $$
+
+**LaTeX para Word:**
+
 ```latex
 N_u = \max\left( \frac{\tau_{rs}}{T_s} + 1 \right)
 ```
 
 **Paso 5.** Cálculo analítico del peso del esfuerzo de control mediante la fórmula:
+
+**Preview:**
+
+$$ \lambda_s = \frac{N_u}{500} \sum_{r=1}^{n_y} K_{rs}^{2} \left( N + 1 - \frac{3\,\tau_{rs}}{2\,T_s} - \frac{N_u - 1}{2} \right) $$
+
+**LaTeX para Word:**
 
 ```latex
 \lambda_s = \frac{N_u}{500} \sum_{r=1}^{n_y} K_{rs}^{2} \left( N + 1 - \frac{3\,\tau_{rs}}{2\,T_s} - \frac{N_u - 1}{2} \right)
@@ -344,9 +550,21 @@ El algoritmo de Optimización por Enjambre de Partículas (PSO), propuesto por E
 
 El algoritmo mantiene un conjunto de `N_p` partículas, cada una de las cuales representa una solución candidata en el espacio de parámetros. Cada partícula `i` posee una posición `x_i` y una velocidad `v_i`, las cuales se actualizan en cada iteración conforme a:
 
+**Preview:**
+
+$$ \mathbf{v}_i^{k+1} = w\,\mathbf{v}_i^{k} + c_1 r_1 (\mathbf{p}_i - \mathbf{x}_i^{k}) + c_2 r_2 (\mathbf{g} - \mathbf{x}_i^{k}) $$
+
+**LaTeX para Word:**
+
 ```latex
 \mathbf{v}_i^{k+1} = w\,\mathbf{v}_i^{k} + c_1 r_1 (\mathbf{p}_i - \mathbf{x}_i^{k}) + c_2 r_2 (\mathbf{g} - \mathbf{x}_i^{k})
 ```
+
+**Preview:**
+
+$$ \mathbf{x}_i^{k+1} = \mathbf{x}_i^{k} + \mathbf{v}_i^{k+1} $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{x}_i^{k+1} = \mathbf{x}_i^{k} + \mathbf{v}_i^{k+1}
@@ -354,10 +572,16 @@ El algoritmo mantiene un conjunto de `N_p` partículas, cada una de las cuales r
 
 donde `p_i` es la mejor posición histórica encontrada por la partícula `i`, `g` es la mejor posición encontrada por todo el enjambre, `w` es el coeficiente de inercia, `c_1` y `c_2` son los coeficientes cognitivo y social respectivamente, y `r_1, r_2 ∈ [0,1]` son números aleatorios. La combinación de los tres términos permite al enjambre explorar el espacio de búsqueda (vía inercia y componente social) al tiempo que explota las regiones prometedoras (vía componente cognitivo).
 
-Para la sintonización del GPC se define el espacio de búsqueda bidimensional `x = [log₁₀(λ), N_u]`, con cotas `log₁₀(λ) ∈ [-4, 0]` y `N_u ∈ [1, N]`. La función objetivo a minimizar es el mismo índice combinado introducido en el paso 5 del método de Shridhar-Cooper:
+Para la sintonización del GPC se define el espacio de búsqueda bidimensional `x = [log₁₀(λ), N_u]`, con cotas `log₁₀(λ) ∈ [-4, 0]` y `N_u ∈ [1, N]`. La función objetivo a minimizar es:
+
+**Preview:**
+
+$$ J_{PSO}(\lambda, N_u) = \text{IAE} + \beta_1 \cdot \Delta U_{total} + \beta_2 \cdot M_p $$
+
+**LaTeX para Word:**
 
 ```latex
-J_{\text{PSO}}(\lambda, N_u) = \text{IAE} + \beta_1 \cdot \Delta U_{\text{total}} + \beta_2 \cdot M_p
+J_{PSO}(\lambda, N_u) = \text{IAE} + \beta_1 \cdot \Delta U_{total} + \beta_2 \cdot M_p
 ```
 
 con `β_1 = 0.1` y `β_2 = 100`. Los parámetros del enjambre adoptados son `N_p = 6` partículas, `5` iteraciones, `w = 0.7`, `c_1 = c_2 = 1.5`, valores estándar reportados en la literatura del PSO aplicado a sintonización de controladores [pendiente encontrar fuente — Han, Zhao y Qian].
@@ -382,21 +606,25 @@ Una vez aplicados los cuatro métodos de sintonización al sistema de cuatro tan
 
 Para cada sintonización se calculan los seis criterios de desempeño definidos en la sección 3.2. Con el objetivo de obtener una comparación objetiva, se construye un **score combinado** a partir de la normalización min-max de cada métrica seguida de su ponderación:
 
+**Preview:**
+
+$$ \text{Score} = \sum_{i=1}^{6} w_i \cdot \tilde{m}_i $$
+
+**LaTeX para Word:**
+
 ```latex
 \text{Score} = \sum_{i=1}^{6} w_i \cdot \tilde{m}_i
 ```
 
 donde `m̃_i` es la i-ésima métrica normalizada al rango [0, 1] —siendo 0 el mejor desempeño y 1 el peor entre los métodos comparados— y `w_i` el peso asignado a cada métrica. Los pesos adoptados son `w = [0.20, 0.15, 0.15, 0.20, 0.15, 0.15]` para IAE, ISE, ITAE, tiempo de establecimiento, sobrepico y esfuerzo de control, respectivamente, otorgando mayor importancia al IAE y al tiempo de establecimiento. El método con menor score se considera el más adecuado para esta aplicación.
 
-[INSERTAR TABLA 3.W — Comparación de los cuatro métodos de sintonización. Columnas: Método, T_s, N, N_u, λ, IAE, ISE, ITAE, t_est, Sobrepico, Esfuerzo, Score. Una fila por método. Datos generados con el script `analisis_sintonizacion_GPC.m`.]
+[INSERTAR TABLA 3.W2 — Comparación de los cuatro métodos de sintonización. Columnas: Método, T_s, N, N_u, λ, IAE, ISE, ITAE, t_est, Sobrepico, Esfuerzo, Score. Una fila por método. Datos generados con el script `analisis_sintonizacion_GPC.m`.]
 
 [INSERTAR FIGURA 3.Y — Comparación gráfica de las respuestas en h₃ obtenidas con los cuatro métodos de sintonización. Eje X: tiempo (s). Eje Y: altura h₃ (cm). Cuatro curvas de colores diferentes, una por método. Línea negra punteada: referencia. Generado con `analisis_sintonizacion_GPC.m`.]
 
 [INSERTAR FIGURA 3.Z — Comparación gráfica de las respuestas en h₄. Mismo formato que la Figura 3.Y.]
 
-[INSERTAR FIGURA 3.W — Gráfica de barras del score combinado por método, ordenadas de menor (mejor) a mayor (peor). Generado con `analisis_sintonizacion_GPC.m`.]
-
-[INSERTAR FIGURA 3.W — Gráfica de barras del score combinado para los cuatro métodos, ordenados de menor (mejor) a mayor (peor). Generada con `analisis_sintonizacion_GPC.m`.]
+[INSERTAR FIGURA 3.W3 — Gráfica de barras del score combinado para los cuatro métodos, ordenados de menor (mejor) a mayor (peor). Generada con `analisis_sintonizacion_GPC.m`.]
 
 A partir del análisis de los resultados se identifica el método ganador como aquel con el menor score combinado. Es esperable que los métodos basados en optimización (PSO y Nelder-Mead) obtengan los mejores resultados debido a su capacidad de minimizar de manera dirigida el índice de desempeño, mientras que los métodos analíticos (Clarke-Mohtadi y Shridhar-Cooper) ofrecen sintonizaciones razonables sin necesidad de simulaciones iterativas, lo cual los hace atractivos cuando no se dispone de un entorno de simulación de alta fidelidad.
 
@@ -416,23 +644,47 @@ Con el propósito de facilitar la implementación práctica del controlador y su
 
 Discretización del modelo lineal:
 
+**Preview:**
+
+$$ (\mathbf{A}_d, \mathbf{B}_d, \mathbf{C}_d) = \text{c2d}(\mathbf{A}_c, \mathbf{B}_c, \mathbf{C}_c,\,T_s,\,\text{ZOH}) $$
+
+**LaTeX para Word:**
+
 ```latex
 (\mathbf{A}_d, \mathbf{B}_d, \mathbf{C}_d) = \text{c2d}(\mathbf{A}_c, \mathbf{B}_c, \mathbf{C}_c,\,T_s,\,\text{ZOH})
 ```
 
 Construcción del modelo aumentado:
 
+**Preview:**
+
+$$ \tilde{\mathbf{A}} = \begin{bmatrix} \mathbf{A}_d & \mathbf{0} \\ \mathbf{C}_d\,\mathbf{A}_d & \mathbf{I} \end{bmatrix},\quad \tilde{\mathbf{B}} = \begin{bmatrix} \mathbf{B}_d \\ \mathbf{C}_d\,\mathbf{B}_d \end{bmatrix},\quad \tilde{\mathbf{C}} = \begin{bmatrix} \mathbf{0} & \mathbf{I} \end{bmatrix} $$
+
+**LaTeX para Word:**
+
 ```latex
-\tilde{\mathbf{A}} = \begin{bmatrix} \mathbf{A}_d & \mathbf{0} \\ \mathbf{C}_d\,\mathbf{A}_d & \mathbf{I} \end{bmatrix}, \quad \tilde{\mathbf{B}} = \begin{bmatrix} \mathbf{B}_d \\ \mathbf{C}_d\,\mathbf{B}_d \end{bmatrix}, \quad \tilde{\mathbf{C}} = \begin{bmatrix} \mathbf{0} & \mathbf{I} \end{bmatrix}
+\tilde{\mathbf{A}} = \begin{bmatrix} \mathbf{A}_d & \mathbf{0} \\ \mathbf{C}_d\,\mathbf{A}_d & \mathbf{I} \end{bmatrix},\quad \tilde{\mathbf{B}} = \begin{bmatrix} \mathbf{B}_d \\ \mathbf{C}_d\,\mathbf{B}_d \end{bmatrix},\quad \tilde{\mathbf{C}} = \begin{bmatrix} \mathbf{0} & \mathbf{I} \end{bmatrix}
 ```
 
-Matrices de predicción:
+Matrices de predicción (bloque `j` de F y bloque `(i,j)` de Φ con `i ≥ j`):
+
+**Preview:**
+
+$$ \mathbf{F}_{[j]} = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{j},\quad \boldsymbol{\Phi}_{[i,j]} = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{\,i-j}\,\tilde{\mathbf{B}} $$
+
+**LaTeX para Word:**
 
 ```latex
-\mathbf{F}_{[j]} = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{j}, \quad \boldsymbol{\Phi}_{[i,j]} = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{\,i-j}\,\tilde{\mathbf{B}} \text{ si } i \ge j
+\mathbf{F}_{[j]} = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{j},\quad \boldsymbol{\Phi}_{[i,j]} = \tilde{\mathbf{C}}\,\tilde{\mathbf{A}}^{\,i-j}\,\tilde{\mathbf{B}}
 ```
 
 Hessiano del problema QP:
+
+**Preview:**
+
+$$ \mathbf{H} = 2\,(\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,\boldsymbol{\Phi} + \mathbf{R}) $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{H} = 2\,(\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,\boldsymbol{\Phi} + \mathbf{R})
@@ -440,13 +692,25 @@ Hessiano del problema QP:
 
 Matriz de restricciones lineales:
 
+**Preview:**
+
+$$ \mathbf{A}_{ineq} = \begin{bmatrix} \mathbf{I}_{N_u n_u} \\ -\mathbf{I}_{N_u n_u} \\ \mathbf{T} \\ -\mathbf{T} \end{bmatrix} $$
+
+**LaTeX para Word:**
+
 ```latex
-\mathbf{A}_{\text{ineq}} = \begin{bmatrix} \mathbf{I}_{N_u n_u} \\ -\mathbf{I}_{N_u n_u} \\ \mathbf{T} \\ -\mathbf{T} \end{bmatrix}
+\mathbf{A}_{ineq} = \begin{bmatrix} \mathbf{I}_{N_u n_u} \\ -\mathbf{I}_{N_u n_u} \\ \mathbf{T} \\ -\mathbf{T} \end{bmatrix}
 ```
 
 **Etapa 2 — Bucle de control en línea (se ejecuta cada `T_s`):**
 
 a) Medición del estado y construcción del estado aumentado:
+
+**Preview:**
+
+$$ \boldsymbol{\xi}(k) = \begin{bmatrix} \mathbf{x}(k) - \mathbf{x}(k-1) \\ \mathbf{y}(k) - \mathbf{y}^{0} \end{bmatrix} $$
+
+**LaTeX para Word:**
 
 ```latex
 \boldsymbol{\xi}(k) = \begin{bmatrix} \mathbf{x}(k) - \mathbf{x}(k-1) \\ \mathbf{y}(k) - \mathbf{y}^{0} \end{bmatrix}
@@ -454,11 +718,23 @@ a) Medición del estado y construcción del estado aumentado:
 
 b) Construcción del vector de referencia futura con trayectoria suavizada:
 
+**Preview:**
+
+$$ \mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k) $$
+
+**LaTeX para Word:**
+
 ```latex
 \mathbf{w}(k+j) = \alpha^{j}\,\mathbf{y}(k) + (1 - \alpha^{j})\,\mathbf{r}(k)
 ```
 
 c) Vector lineal del QP:
+
+**Preview:**
+
+$$ \mathbf{f}(k) = -2\,\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,(\mathbf{W}(k) - \mathbf{F}\,\boldsymbol{\xi}(k)) $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{f}(k) = -2\,\boldsymbol{\Phi}^{T}\,\mathbf{Q}\,(\mathbf{W}(k) - \mathbf{F}\,\boldsymbol{\xi}(k))
@@ -466,17 +742,35 @@ c) Vector lineal del QP:
 
 d) Vector de cotas de las restricciones:
 
+**Preview:**
+
+$$ \mathbf{b}_{ineq}(k) = \begin{bmatrix} \Delta\mathbf{U}_{max} \\ -\Delta\mathbf{U}_{min} \\ \mathbf{U}_{max} - \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \\ -\mathbf{U}_{min} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \end{bmatrix} $$
+
+**LaTeX para Word:**
+
 ```latex
-\mathbf{b}_{\text{ineq}}(k) = \begin{bmatrix} \Delta\mathbf{U}_{\max} \\ -\Delta\mathbf{U}_{\min} \\ \mathbf{U}_{\max} - \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \\ -\mathbf{U}_{\min} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \end{bmatrix}
+\mathbf{b}_{ineq}(k) = \begin{bmatrix} \Delta\mathbf{U}_{max} \\ -\Delta\mathbf{U}_{min} \\ \mathbf{U}_{max} - \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \\ -\mathbf{U}_{min} + \boldsymbol{\mathcal{I}}\,\mathbf{u}(k-1) \end{bmatrix}
 ```
 
 e) Resolución del problema QP:
 
+**Preview:**
+
+$$ \Delta\mathbf{U}^{*}(k) = \arg\min_{\Delta\mathbf{U}}\ \frac{1}{2}\,\Delta\mathbf{U}^{T}\,\mathbf{H}\,\Delta\mathbf{U} + \mathbf{f}(k)^{T}\,\Delta\mathbf{U}\quad \text{s.a.}\quad \mathbf{A}_{ineq}\,\Delta\mathbf{U} \le \mathbf{b}_{ineq}(k) $$
+
+**LaTeX para Word:**
+
 ```latex
-\Delta\mathbf{U}^{*}(k) = \arg\min_{\Delta\mathbf{U}}\ \frac{1}{2}\,\Delta\mathbf{U}^{T}\,\mathbf{H}\,\Delta\mathbf{U} + \mathbf{f}(k)^{T}\,\Delta\mathbf{U} \quad \text{s.a.} \quad \mathbf{A}_{\text{ineq}}\,\Delta\mathbf{U} \le \mathbf{b}_{\text{ineq}}(k)
+\Delta\mathbf{U}^{*}(k) = \arg\min_{\Delta\mathbf{U}}\ \frac{1}{2}\,\Delta\mathbf{U}^{T}\,\mathbf{H}\,\Delta\mathbf{U} + \mathbf{f}(k)^{T}\,\Delta\mathbf{U}\quad \text{s.a.}\quad \mathbf{A}_{ineq}\,\Delta\mathbf{U} \le \mathbf{b}_{ineq}(k)
 ```
 
 f) Aplicación del primer incremento al actuador:
+
+**Preview:**
+
+$$ \mathbf{u}(k) = \mathbf{u}(k-1) + \Delta\mathbf{U}^{*}_{[1:n_u]}(k) $$
+
+**LaTeX para Word:**
 
 ```latex
 \mathbf{u}(k) = \mathbf{u}(k-1) + \Delta\mathbf{U}^{*}_{[1:n_u]}(k)
