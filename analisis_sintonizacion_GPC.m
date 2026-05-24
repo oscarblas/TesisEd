@@ -83,47 +83,53 @@ escenario = struct('t_sim',t_sim,'t_cambio',t_cambio, ...
 % ========================================================================
 metodos = {};
 
-% --- Metodo 1: Clarke-Mohtadi (1989) ----------------------------------
-% N1=1, N2 = ~ tiempo de subida, Nu = 1-3, lambda heuristico
-% Para tanques: tiempo de subida ~ T_dom * 2.2, asi que N2 cubre eso
-Ts_cm = round(T_dom/15);  if Ts_cm<1, Ts_cm=1; end
+% ------------------------------------------------------------------------
+%  IMPORTANTE: Ts y N son parametros del MODELO fijados a priori en la
+%  seccion 3.3.2 usando las reglas de Shridhar-Cooper aplicadas a la
+%  dinamica de la planta. Se mantienen CONSTANTES para todos los metodos
+%  de sintonizacion. La sintonizacion solo determina Nu, delta y lambda.
+% ------------------------------------------------------------------------
+Ts_fijo = 2;        % de la seccion 3.3.2: Ts = min(0.1 * tau_ij)
+N_fijo  = 50;       % de la seccion 3.3.2: N  = max(5 * tau_ij / Ts + 1)
+
+% --- Metodo 1: Clarke-Mohtadi (1987) ----------------------------------
+% Sintoniza solo Nu, delta y lambda (Ts y N se toman de 3.3.2).
+% Reglas: Nu pequeno (1 a 3) para robustez, delta unitario y lambda
+% moderado como punto de partida.
 metodos{1} = struct('nombre','Clarke-Mohtadi', ...
-    'Ts', Ts_cm, ...
-    'N',  round(2.2*T_dom/Ts_cm), ...
+    'Ts', Ts_fijo, ...
+    'N',  N_fijo, ...
     'Nu', 2, ...
     'delta',  [1 1], ...
     'lambda', [0.5 0.5]);
 
 % --- Metodo 2: Shridhar-Cooper (1997) ---------------------------------
-% lambda analitico:  lambda = (g_p^2)/(N * tr^2 * factor)
-% Para MIMO usamos ganancia maxima de B
-g_p = max(abs(Cc*(-Ac\Bc)),[],'all');   % ganancia estacionaria aproximada
-tr_des = T_dom*0.5;   % tiempo de subida deseado (mas rapido que abierto)
-Ts_sc = round(T_dom/20); if Ts_sc<1, Ts_sc=1; end
-N_sc  = round(tr_des/Ts_sc);
-lambda_sc = (g_p^2)/(N_sc * (tr_des/Ts_sc)^2 * 10);
+% Sintoniza Nu y lambda analiticamente (Ts y N se toman de 3.3.2).
+% Nu = max(tau_ij/Ts + 1)  (~63.2% del tiempo de establecimiento)
+% lambda = (Nu/500) * sum(K_rs^2 * (N + 1 - 3*tau/2/Ts - (Nu-1)/2))
+T_dom_v = [T1 T2 T3 T4];
+Nu_sc = max(round(T_dom_v/Ts_fijo + 1));
+g_p = max(abs(Cc*(-Ac\Bc)),[],'all');     % ganancia estacionaria aproximada
+lambda_sc = (Nu_sc/500)*g_p^2*(N_fijo + 1 - 3*T_dom/(2*Ts_fijo) - (Nu_sc-1)/2);
+lambda_sc = max(lambda_sc, 1e-4);          % evitar lambdas negativos o nulos
 metodos{2} = struct('nombre','Shridhar-Cooper', ...
-    'Ts', Ts_sc, ...
-    'N',  N_sc, ...
-    'Nu', max(round(N_sc/5),3), ...
+    'Ts', Ts_fijo, ...
+    'N',  N_fijo, ...
+    'Nu', Nu_sc, ...
     'delta',  [1 1], ...
     'lambda', [lambda_sc lambda_sc]);
 
 % --- Metodo 3: PSO (Particle Swarm Optimization) ----------------------
-% Eberhart y Kennedy (1995). Optimizacion metaheuristica que busca el
-% optimo global de [log10(lambda), Nu] sobre el indice combinado.
+% Optimiza Nu y lambda mediante enjambre de particulas (Ts y N de 3.3.2).
 fprintf('Ejecutando PSO (puede tardar)...\n');
-Ts_pso = 2;
-N_pso  = 50;
 delta_pso = [10 10];
 
-obj_pso = @(x) costo_optimizacion(x, Ts_pso, N_pso, delta_pso, planta, escenario);
+obj_pso = @(x) costo_optimizacion(x, Ts_fijo, N_fijo, delta_pso, planta, escenario);
 
-% Parametros del enjambre
 pso_opts = struct('N_particles', 6, 'N_iters', 5, ...
                   'w', 0.7, 'c1', 1.5, 'c2', 1.5);
-lb_pso = [log10(1e-4), 1];     % [log10(lambda_min), Nu_min]
-ub_pso = [log10(1),   N_pso];  % [log10(lambda_max), Nu_max]
+lb_pso = [log10(1e-4), 1];        % [log10(lambda_min), Nu_min]
+ub_pso = [log10(1),   N_fijo];    % [log10(lambda_max), Nu_max]
 
 [x_pso, ~] = pso_simple(obj_pso, 2, lb_pso, ub_pso, pso_opts);
 
@@ -131,23 +137,20 @@ lambda_pso = 10^x_pso(1);
 Nu_pso = max(round(x_pso(2)), 1);
 
 metodos{3} = struct('nombre','PSO', ...
-    'Ts', Ts_pso, ...
-    'N',  N_pso, ...
+    'Ts', Ts_fijo, ...
+    'N',  N_fijo, ...
     'Nu', Nu_pso, ...
     'delta',  delta_pso, ...
     'lambda', [lambda_pso lambda_pso]);
 
 % --- Metodo 4: Nelder-Mead via fminsearch ------------------------------
-% Optimizacion numerica directa (sin gradiente) sobre el mismo indice
-% combinado utilizado en PSO, partiendo de la solucion entregada por PSO
-% para acelerar la convergencia.
+% Optimizacion numerica directa de Nu y lambda (Ts y N de 3.3.2),
+% partiendo del optimo entregado por PSO.
 fprintf('Ejecutando fminsearch (Nelder-Mead)...\n');
-Ts_opt = 2;
-N_opt  = 50;
 delta_opt = [10 10];
 
-obj = @(x) costo_optimizacion(x, Ts_opt, N_opt, delta_opt, planta, escenario);
-x0 = [log10(0.01), 10];                % [log10(lambda), Nu]
+obj = @(x) costo_optimizacion(x, Ts_fijo, N_fijo, delta_opt, planta, escenario);
+x0 = x_pso;     % parte del optimo PSO para refinar
 opciones = optimset('Display','off','MaxIter',15,'TolX',0.5);
 x_opt = fminsearch(obj, x0, opciones);
 
@@ -155,8 +158,8 @@ lambda_optim = 10^x_opt(1);
 Nu_optim = max(round(x_opt(2)),1);
 
 metodos{4} = struct('nombre','Nelder-Mead (fminsearch)', ...
-    'Ts', Ts_opt, ...
-    'N',  N_opt, ...
+    'Ts', Ts_fijo, ...
+    'N',  N_fijo, ...
     'Nu', Nu_optim, ...
     'delta',  delta_opt, ...
     'lambda', [lambda_optim lambda_optim]);

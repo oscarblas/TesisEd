@@ -479,11 +479,11 @@ La operación del controlador GPC MIMO en cada instante de muestreo se resume en
 
 ### 3.4.1 Generalidades y necesidad de sintonización
 
-Una vez establecida la estructura del controlador GPC mediante el diseño matricial presentado en la sección 3.3, resta determinar los valores numéricos de sus parámetros: el período de muestreo `T_s`, el horizonte de predicción `N`, el horizonte de control `N_u`, los pesos del error de seguimiento `δ₁, δ₂` y los pesos del esfuerzo de control `λ₁, λ₂`. La selección adecuada de estos parámetros es crítica, ya que afecta directamente el compromiso entre velocidad de respuesta, robustez ante incertidumbre del modelo, manejo de restricciones y costo computacional.
+Como se estableció en la sección 3.3.2, los parámetros del modelo del controlador —el período de muestreo `T_s` y el horizonte de predicción `N`— se determinaron a priori a partir de la dinámica de la planta mediante las reglas de Shridhar-Cooper, y se mantienen constantes durante todo el proceso de diseño. En consecuencia, el problema de sintonización se reduce a determinar los valores adecuados de los parámetros restantes: el **horizonte de control `N_u`**, los **pesos del error de seguimiento `δ₁, δ₂`** y los **pesos del esfuerzo de control `λ₁, λ₂`**. La selección de estos parámetros es crítica, ya que afecta directamente el compromiso entre velocidad de respuesta, robustez ante incertidumbre del modelo, manejo de restricciones y costo computacional.
 
 En la literatura existen cuatro grandes familias de métodos de sintonización para controladores predictivos: (i) reglas **heurístico-analíticas** basadas en la dinámica nominal del proceso, (ii) métodos **analíticos explícitos** derivados a partir de aproximaciones de bajo orden de la planta, (iii) algoritmos **metaheurísticos globales** inspirados en procesos naturales y (iv) métodos de **optimización numérica directa** basados en algoritmos de búsqueda local sin gradiente.
 
-En esta tesis se aplican y comparan **cuatro métodos representativos** —uno por cada familia metodológica— con el objetivo de identificar la sintonización que ofrezca el mejor compromiso entre simplicidad de aplicación, calidad de la respuesta y robustez del controlador.
+En esta tesis se aplican y comparan **cuatro métodos representativos** —uno por cada familia metodológica— con el objetivo de identificar la sintonización que ofrezca el mejor compromiso entre simplicidad de aplicación, calidad de la respuesta y robustez del controlador. En todos los casos, las reglas o algoritmos propuestos por cada método se aplican **únicamente** sobre `N_u`, `δ` y `λ`, manteniendo `T_s = 2 s` y `N = 50` conforme a la Tabla 3.1.
 
 **Tabla 3.A — Métodos de sintonización considerados**
 
@@ -496,31 +496,21 @@ En esta tesis se aplican y comparan **cuatro métodos representativos** —uno p
 
 ### 3.4.2 Método de Clarke-Mohtadi
 
-El método propuesto originalmente por Clarke, Mohtadi y Tuffs en la formulación inicial del GPC [pendiente encontrar fuente — Clarke et al. 1987] establece reglas prácticas basadas en las características dinámicas del proceso. Las reglas básicas son:
+El método propuesto originalmente por Clarke, Mohtadi y Tuffs en la formulación inicial del GPC [pendiente encontrar fuente — Clarke et al. 1987] establece reglas prácticas para la sintonización del horizonte de control y los pesos del controlador. Los parámetros del modelo (`T_s` y `N`) se mantienen en los valores fijados en la sección 3.3.2. Las reglas restantes son:
 
-- **Período de muestreo:** `T_s ≈ τ_dom / 10` a `T_s ≈ τ_dom / 20`, donde `τ_dom` es la constante de tiempo dominante del sistema.
+- **Horizonte de control pequeño** para favorecer la robustez, típicamente `N_u = 1` a `3`. Esta elección evita una flexibilidad excesiva que pudiera amplificar la sensibilidad al ruido de medición.
 
-- **Horizonte de predicción** que cubra el tiempo de subida en lazo abierto:
+- **Ponderación del error de seguimiento** unitaria: `δ₁ = δ₂ = 1`, suponiendo que ambas salidas tienen igual prioridad.
 
-**Preview:**
+- **Ponderación del esfuerzo de control** moderada: `λ₁ = λ₂ ≈ 0.5` como punto de partida conservador. Valores mayores producen control más suave; valores menores, más agresivo.
 
-$$ N = \left\lceil \frac{2.2 \cdot \tau_{dom}}{T_s} \right\rceil $$
-
-**LaTeX para Word:**
-
-```latex
-N = \left\lceil \frac{2.2 \cdot \tau_{dom}}{T_s} \right\rceil
-```
-
-- **Horizonte de control pequeño** para favorecer la robustez (típicamente `N_u = 1` a `3`).
-
-- **Ponderaciones** iniciales con `δ₁ = δ₂ = 1` y `λ` moderado (`λ ≈ 0.5`).
+Aplicando estas reglas se obtienen los valores iniciales mostrados en la Tabla 3.X. Cabe destacar que el método de Clarke-Mohtadi proporciona un punto de partida robusto pero típicamente conservador, sin garantía de optimalidad respecto a un índice de desempeño específico.
 
 [INSERTAR TABLA 3.X — Parámetros del controlador GPC obtenidos por el método de Clarke-Mohtadi. Datos generados con `analisis_sintonizacion_GPC.m`.]
 
 ### 3.4.3 Método de Shridhar-Cooper extendido a MIMO
 
-El método propuesto por Shridhar y Cooper [pendiente encontrar fuente — Shridhar & Cooper 1997] es un enfoque analítico basado en la aproximación del proceso por un modelo de primer orden más tiempo muerto (FOPDT). El método fue concebido originalmente para el caso monovariable y extendido al ámbito multivariable [10].
+El método propuesto por Shridhar y Cooper [pendiente encontrar fuente — Shridhar & Cooper 1997] es un enfoque analítico basado en la aproximación del proceso por un modelo de primer orden más tiempo muerto (FOPDT). El método fue concebido originalmente para el caso monovariable y extendido al ámbito multivariable [10]. Las mismas reglas de Shridhar-Cooper se utilizaron en la sección 3.3.2 para fijar `T_s` y `N`; en esta sección se aplican las reglas restantes del método para determinar `N_u` y `λ`.
 
 **Paso 1.** Aproximación de cada subproceso `(r, s)` por un modelo FOPDT:
 
@@ -534,31 +524,9 @@ $$ G_{rs}(s) = \frac{K_{rs}\,e^{-\theta_{rs}\,s}}{\tau_{rs}\,s + 1} $$
 G_{rs}(s) = \frac{K_{rs}\,e^{-\theta_{rs}\,s}}{\tau_{rs}\,s + 1}
 ```
 
-**Paso 2.** Período de muestreo:
+donde `K_{rs}` es la ganancia estática, `τ_{rs}` la constante de tiempo y `θ_{rs}` el retardo de transporte (despreciable en este sistema).
 
-**Preview:**
-
-$$ T_s = \min\left( 0.1 \cdot \tau_{rs} \right) $$
-
-**LaTeX para Word:**
-
-```latex
-T_s = \min\left( 0.1 \cdot \tau_{rs} \right)
-```
-
-**Paso 3.** Horizonte de predicción:
-
-**Preview:**
-
-$$ N = \max\left( \frac{5\,\tau_{rs}}{T_s} + 1 \right) $$
-
-**LaTeX para Word:**
-
-```latex
-N = \max\left( \frac{5\,\tau_{rs}}{T_s} + 1 \right)
-```
-
-**Paso 4.** Horizonte de control:
+**Paso 2.** Cálculo del horizonte de control como el 63.2% del tiempo de establecimiento del subproceso más lento:
 
 **Preview:**
 
@@ -570,7 +538,7 @@ $$ N_u = \max\left( \frac{\tau_{rs}}{T_s} + 1 \right) $$
 N_u = \max\left( \frac{\tau_{rs}}{T_s} + 1 \right)
 ```
 
-**Paso 5.** Cálculo analítico del peso del esfuerzo de control:
+**Paso 3.** Cálculo analítico del peso del esfuerzo de control:
 
 **Preview:**
 
@@ -581,6 +549,8 @@ $$ \lambda_s = \frac{N_u}{500} \sum_{r=1}^{n_y} K_{rs}^{2} \left( N + 1 - \frac{
 ```latex
 \lambda_s = \frac{N_u}{500} \sum_{r=1}^{n_y} K_{rs}^{2} \left( N + 1 - \frac{3\,\tau_{rs}}{2\,T_s} - \frac{N_u - 1}{2} \right)
 ```
+
+La principal ventaja de este método es la obtención analítica de los parámetros sin necesidad de iteración o simulación, partiendo únicamente de las propiedades estáticas y dinámicas del modelo de la planta.
 
 [INSERTAR TABLA 3.Y — Parámetros del controlador GPC obtenidos por el método de Shridhar-Cooper. Datos generados con `analisis_sintonizacion_GPC.m`.]
 
