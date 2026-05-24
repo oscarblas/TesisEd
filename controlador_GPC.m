@@ -1,45 +1,39 @@
 %% ========================================================================
 %  controlador_GPC.m
 %  Control Predictivo Generalizado (GPC) Multivariable
-%  Aplicado al sistema de 4 tanques acoplados
+%  Formulacion CARIMA + ecuaciones diofanticas, aplicada al sistema de
+%  cuatro tanques acoplados.
 %
-%  Estructura:
-%    1. Definicion de la planta (parametros y punto de operacion)
-%    2. Modelo lineal continuo y discretizacion
-%    3. Modelo aumentado para accion integral (formulacion en Delta_u)
-%    4. Matrices de prediccion (F y Phi)
-%    5. Funcion de costo y matrices de ponderacion (Q, R)
-%    6. Restricciones (formulacion QP)
-%    7. Lazo de control con horizonte deslizante (sobre planta no lineal)
-%    8. Graficas y analisis
+%  Estructura del archivo:
+%   1) Parametros fisicos y punto de operacion
+%   2) Modelo lineal continuo y discretizacion
+%   3) Matriz de funciones de transferencia G(z) y coeficientes de
+%      respuesta al escalon (g_ij[k]) que conforman la matriz dinamica
+%   4) Construccion de la matriz dinamica G por bloques (formato GPC)
+%   5) Matrices de ponderacion Q, R y Hessiano H del QP
+%   6) Restricciones (formulacion QP)
+%   7) Bucle de control con horizonte deslizante sobre la planta no lineal
+%   8) Graficas y analisis
 % ========================================================================
 
 clear; clc; close all;
 
 %% ========================================================================
 %  1) PARAMETROS FISICOS Y PUNTO DE OPERACION
-%  ------------------------------------------------------------------------
-%  Mismo modelo del sistema de 4 tanques que usamos en respuesta_escalon.m
 % ========================================================================
+A1=706.85; A2=706.85; A3=706.85; A4=706.85;
+a1=1.89;   a2=1.89;   a3=5.39;   a4=5.39;
+k1=1;      k2=1;
+y1=0.7;    y2=0.7;
+g=981;
 
-% Parametros fisicos
-A1=706.85; A2=706.85; A3=706.85; A4=706.85;   % Areas de tanques [cm^2]
-a1=1.89;   a2=1.89;   a3=5.39;   a4=5.39;     % Areas de salida [cm^2]
-k1=1;      k2=1;                              % Ganancias de bombas
-y1=0.7;    y2=0.7;                            % Posicion de valvulas (0-1)
-g=981;                                        % Gravedad [cm/s^2]
-
-% Punto de operacion (alturas deseadas en tanques inferiores)
 h30 = 25; h40 = 25;
-
-% Calculo de entradas estacionarias resolviendo equilibrio
-M_A = [(1-y1)*k1   y2*k2;
-       y1*k1       (1-y2)*k2];
+M_A = [(1-y1)*k1 y2*k2;
+       y1*k1    (1-y2)*k2];
 M_B = [a3*sqrt(2*g*h30); a4*sqrt(2*g*h40)];
 u0  = M_A\M_B;
 u10 = u0(1); u20 = u0(2);
 
-% Alturas estacionarias de tanques superiores
 h10 = ((1-y2)*k2*u20/a1)^2/(2*g);
 h20 = ((1-y1)*k1*u10/a2)^2/(2*g);
 h0  = [h10; h20; h30; h40];
@@ -50,18 +44,14 @@ fprintf('  u0 = [%.2f, %.2f]\n\n', u10, u20);
 
 %% ========================================================================
 %  2) MODELO LINEAL CONTINUO Y DISCRETIZACION
-%  ------------------------------------------------------------------------
-%  El GPC trabaja en tiempo discreto, asi que tomamos las matrices A,B,C,D
-%  del modelo linealizado y las convertimos a tiempo discreto con periodo
-%  de muestreo Ts.
 % ========================================================================
-
-% Matrices del modelo lineal continuo (linealizacion alrededor de h0)
+% Constantes de tiempo
 T1 = A1/a1*sqrt(2*h10/g);
 T2 = A2/a2*sqrt(2*h20/g);
 T3 = A3/a3*sqrt(2*h30/g);
 T4 = A4/a4*sqrt(2*h40/g);
 
+% Modelo lineal continuo en espacio de estados (alrededor de h0)
 Ac = [-1/T1        0           0      0;
        0          -1/T2        0      0;
        0           A2/(A3*T2) -1/T3   0;
@@ -72,209 +62,142 @@ Bc = [0            (1-y2)*k2/A1;
       0             y2*k2/A3;
       y1*k1/A4      0];
 
-% Solo controlamos h3 y h4 (tanques inferiores) -> 2 salidas
+% Salidas controladas: h3 (TK-03) y h4 (TK-04)
 Cc = [0 0 1 0;
       0 0 0 1];
-
 Dc = zeros(2,2);
 
-% Discretizacion con ZOH (zero-order hold)
-% Ts obtenido del analisis comparativo de sintonizacion (analisis_sintonizacion_GPC.m)
-% Metodo ganador: Optimizacion numerica via fminsearch
-%   Score = 0.0733 | IAE = 213.7 | t_est = 18s | overshoot = 0.05%
-Ts = 2;                                % Periodo de muestreo [s]
+% Discretizacion con ZOH (parametro de sintonizacion)
+Ts = 2;
 sys_c = ss(Ac, Bc, Cc, Dc);
 sys_d = c2d(sys_c, Ts, 'zoh');
-[Ad, Bd, Cd, Dd] = ssdata(sys_d);
 
-% Dimensiones del sistema
-nx = size(Ad,1);   % numero de estados (4)
-nu = size(Bd,2);   % numero de entradas (2)
-ny = size(Cd,1);   % numero de salidas (2)
-
-fprintf('Modelo discretizado con Ts = %d s\n', Ts);
-fprintf('  Estados: %d  |  Entradas: %d  |  Salidas: %d\n\n', nx, nu, ny);
+ny = 2;   % numero de salidas controladas (h3, h4)
+nu = 2;   % numero de entradas (u1, u2)
 
 %% ========================================================================
-%  3) MODELO AUMENTADO PARA ACCION INTEGRAL
+%  3) MATRIZ DE FUNCIONES DE TRANSFERENCIA Y RESPUESTAS AL ESCALON
 %  ------------------------------------------------------------------------
-%  En GPC se trabaja con incrementos de control Du(k) = u(k) - u(k-1)
-%  para garantizar accion integral (error nulo en estado estacionario
-%  ante perturbaciones constantes).
+%  Para cada par entrada(j) - salida(i) se obtiene la funcion de transfe-
+%  rencia discreta G_ij(z) y, a partir de ella, los coeficientes de la
+%  respuesta al escalon g_ij[k] = y_step_ij(k*Ts), para k = 1..N.
 %
-%  Definimos un nuevo estado aumentado:
-%       xi(k) = [Dx(k); y(k)]
-%  donde Dx(k) = x(k) - x(k-1)
-%
-%  Modelo aumentado:
-%       xi(k+1) = A_t*xi(k) + B_t*Du(k)
-%       y(k)    = C_t*xi(k)
-%
-%  De este modo la entrada del problema de optimizacion son los incrementos
-%  Du(k), Du(k+1), ..., Du(k+Nu-1)
+%  Estos coeficientes son los que aparecen en el desarrollo CARIMA + dio-
+%  fantico al construir la matriz dinamica G: el bloque G_ij es triangular
+%  inferior y contiene los coeficientes de la respuesta al escalon de
+%  cada subproceso.
 % ========================================================================
+N  = 50;   % horizonte de prediccion (N2 con N1 = 1, d = 0)
+Nu = 9;    % horizonte de control
 
-A_t = [Ad        zeros(nx,ny);
-       Cd*Ad    eye(ny)];
+G_z = tf(sys_d);   % matriz de funciones de transferencia discretas
 
-B_t = [Bd;
-       Cd*Bd];
-
-C_t = [zeros(ny,nx)  eye(ny)];
-
-n_xi = size(A_t,1);   % dimension del estado aumentado
-
-%% ========================================================================
-%  4) MATRICES DE PREDICCION
-%  ------------------------------------------------------------------------
-%  Horizontes:
-%    N  = horizonte de prediccion (cuantos pasos al futuro miramos)
-%    Nu = horizonte de control    (cuantos Du futuros optimizamos)
-%
-%  Ecuacion de prediccion en forma matricial:
-%       Y = F*xi(k) + Phi*DU
-%
-%  Donde:
-%    Y   = [y(k+1); y(k+2); ...; y(k+N)]      vector de predicciones
-%    DU  = [Du(k); Du(k+1); ...; Du(k+Nu-1)]  vector de incrementos
-%    F   = matriz que captura el efecto del estado actual
-%    Phi = matriz que captura el efecto de los Du futuros (lower-triangular)
-% ========================================================================
-
-% Horizontes obtenidos del analisis de sintonizacion (metodo ganador: optimizacion numerica)
-N  = 50;   % Horizonte de prediccion
-Nu = 9;    % Horizonte de control (optimo encontrado por fminsearch)
-
-% Matriz F (apila C_t * A_t^j)
-F = zeros(N*ny, n_xi);
-for j = 1:N
-    F((j-1)*ny+1:j*ny, :) = C_t * A_t^j;
-end
-
-% Matriz Phi (lower-triangular block matrix)
-Phi = zeros(N*ny, Nu*nu);
-for i = 1:N
-    for j = 1:Nu
-        if i >= j
-            Phi((i-1)*ny+1:i*ny, (j-1)*nu+1:j*nu) = C_t * A_t^(i-j) * B_t;
-        end
+% g_step{i,j} contiene el vector [g_ij(1); g_ij(2); ...; g_ij(N)]
+g_step = cell(ny, nu);
+t_step = (0:N)*Ts;
+for i = 1:ny
+    for j = 1:nu
+        [y_step_ij, ~] = step(G_z(i,j), t_step);
+        g_step{i,j} = y_step_ij(2:end);     % descarta y(0)
     end
 end
 
 %% ========================================================================
-%  5) FUNCION DE COSTO Y MATRICES DE PONDERACION
+%  4) MATRIZ DINAMICA G POR BLOQUES (FORMULACION GPC MIMO)
 %  ------------------------------------------------------------------------
-%  Funcion de costo cuadratica:
+%  Convencion de apilado (consistente con el formalismo GPC clasico):
+%     Y_pred = [y_1(k+1); ...; y_1(k+N); y_2(k+1); ...; y_2(k+N)]
+%     Delta_U = [Du_1(k); ...; Du_1(k+Nu-1); Du_2(k); ...; Du_2(k+Nu-1)]
 %
-%       J = (Y - W)' * Q * (Y - W)  +  DU' * R * DU
+%  La matriz G tiene tamaño (ny*N) x (nu*Nu) y se construye con bloques
+%  G_ij (cada uno triangular inferior, dimensiones N x Nu):
 %
-%  donde:
-%    W = vector de referencias futuras [w(k+1); w(k+2); ...; w(k+N)]
-%    Q = matriz que pondera errores de seguimiento (delta en GPC clasico)
-%    R = matriz que pondera esfuerzo de control (lambda en GPC clasico)
-%
-%  Sustituyendo Y = F*xi + Phi*DU:
-%
-%       J = DU'*(Phi'*Q*Phi + R)*DU - 2*(W - F*xi)'*Q*Phi*DU + const
-%
-%  Forma estandar para quadprog:  min  0.5*DU'*H*DU + f'*DU
+%     G = [G_11  G_12]
+%         [G_21  G_22]
 % ========================================================================
-
-% Pesos optimos del analisis comparativo (metodo: optimizacion numerica fminsearch)
-delta  = [10, 10];                    % peso de seguimiento para [h3, h4]
-lambda = [0.0076803, 0.0076803];      % peso de esfuerzo de control [Du1, Du2] (optimo)
-
-% Matrices de ponderacion (block-diagonales)
-Q = kron(eye(N),  diag(delta));    % size: (N*ny) x (N*ny)
-R = kron(eye(Nu), diag(lambda));   % size: (Nu*nu) x (Nu*nu)
-
-% Hessiano (constante, se calcula una sola vez)
-H = 2*(Phi'*Q*Phi + R);
-H = (H + H')/2;   % asegurar simetria numerica
+G = zeros(ny*N, nu*Nu);
+for i = 1:ny
+    for j = 1:nu
+        G_block = zeros(N, Nu);
+        for r = 1:N
+            for c = 1:Nu
+                if r >= c
+                    G_block(r,c) = g_step{i,j}(r - c + 1);
+                end
+            end
+        end
+        G((i-1)*N + (1:N), (j-1)*Nu + (1:Nu)) = G_block;
+    end
+end
 
 %% ========================================================================
-%  6) RESTRICCIONES (FORMULACION PARA QP)
-%  ------------------------------------------------------------------------
-%  En sistemas reales tenemos limites fisicos:
-%
-%   (a) En el incremento de control:    Du_min <= Du(k+i) <= Du_max
-%   (b) En la entrada absoluta:         u_min  <= u(k+i)  <= u_max
-%   (c) En la salida (opcional):        y_min  <= y(k+i)  <= y_max
-%
-%  La restriccion (a) es directa porque DU es la variable de decision.
-%  La restriccion (b) requiere expresar u(k+i) como acumulado de Du:
-%       u(k+i) = u(k-1) + sum_{j=0..i} Du(k+j)
-%  Lo cual se escribe matricialmente como:  u_futuro = T*DU + 1*u(k-1)
+%  5) MATRICES DE PONDERACION Y HESSIANO
 % ========================================================================
+% Pesos (sintonizacion ganadora del analisis comparativo)
+delta  = [10, 10];                    % peso de seguimiento [h3, h4]
+lambda = [0.0076803, 0.0076803];      % peso de esfuerzo    [Du1, Du2]
 
-% Limites fisicos (tu los ajustas segun la planta real)
-Du_max = [100; 100];         % maximo cambio por paso (mas margen para respuesta rapida)
-Du_min = -Du_max;
+% Matrices Q y R en el formato apilado por salida / por entrada:
+Q = blkdiag(delta(1)*eye(N),  delta(2)*eye(N));        % (ny*N) x (ny*N)
+R = blkdiag(lambda(1)*eye(Nu), lambda(2)*eye(Nu));     % (nu*Nu) x (nu*Nu)
 
-u_max = [u10*2; u20*2];      % limite superior absoluto (100% sobre estacionario)
-u_min = [0; 0];              % las bombas no pueden dar caudal negativo
+% Hessiano del QP (constante)
+H_qp = 2*(G'*Q*G + R);
+H_qp = (H_qp + H_qp')/2;
 
-% Matriz T: u_futuro = T*DU + ones*u(k-1)
-% T es lower-triangular de bloques identidad
-T_mat = kron(tril(ones(Nu)), eye(nu));
-ones_blk = repmat(eye(nu), Nu, 1);
-
-% Construccion de A_ineq * DU <= b_ineq
-%   Du_min <= DU <= Du_max
-%   u_min  <= T*DU + ones*u(k-1) <= u_max
+%% ========================================================================
+%  6) RESTRICCIONES (FORMULACION QP)
+%  ------------------------------------------------------------------------
+%  Tipos de restriccion:
+%   - sobre el incremento de control: Du_min <= Du(k+i) <= Du_max
+%   - sobre el valor absoluto:        u_min  <= u(k+i)  <= u_max
 %
-% Note: parte que depende de u(k-1) se actualiza cada iteracion
-A_ineq_static = [ eye(Nu*nu);
-                 -eye(Nu*nu);
+%  Para el formato de apilado por entrada, la matriz T que expresa
+%  u(k+i) = u(k-1) + sum_{j=0..i} Du(k+j) es bloque-diagonal con bloques
+%  triangulares inferiores de unos (uno por entrada).
+% ========================================================================
+Du_max = [100; 100];     % maximo incremento por paso (por canal)
+Du_min = -Du_max;
+u_max  = [u10*2; u20*2]; % limite superior de las bombas
+u_min  = [0; 0];
+
+% Vectorizar limites (por canal: Nu valores de Du, Nu valores de u)
+Du_max_vec = [repmat(Du_max(1), Nu, 1); repmat(Du_max(2), Nu, 1)];
+Du_min_vec = [repmat(Du_min(1), Nu, 1); repmat(Du_min(2), Nu, 1)];
+u_max_vec  = [repmat(u_max(1),  Nu, 1); repmat(u_max(2),  Nu, 1)];
+u_min_vec  = [repmat(u_min(1),  Nu, 1); repmat(u_min(2),  Nu, 1)];
+
+% Matriz T bloque-diagonal (triangular inferior por canal)
+Tri_one = tril(ones(Nu));
+T_mat   = blkdiag(Tri_one, Tri_one);
+
+A_ineq_static = [ eye(nu*Nu);
+                 -eye(nu*Nu);
                   T_mat;
                  -T_mat ];
 
-% Limites para Du y u (la parte dependiente de u(k-1) la ponemos en el lazo)
-Du_max_vec = repmat(Du_max, Nu, 1);
-Du_min_vec = repmat(Du_min, Nu, 1);
-u_max_vec  = repmat(u_max,  Nu, 1);
-u_min_vec  = repmat(u_min,  Nu, 1);
-
 %% ========================================================================
-%  7) LAZO DE CONTROL CON HORIZONTE DESLIZANTE
-%  ------------------------------------------------------------------------
-%  En cada instante k:
-%    1. Medir/estimar el estado actual x(k)
-%    2. Construir xi(k) = [Dx(k); y(k)]
-%    3. Construir referencia futura W
-%    4. Resolver QP -> obtener DU optimo
-%    5. Aplicar SOLO el primer incremento: u(k) = u(k-1) + Du(k)
-%    6. Avanzar la planta NO LINEAL un paso de Ts
-%    7. Repetir
+%  7) BUCLE DE CONTROL CON HORIZONTE DESLIZANTE
 % ========================================================================
+[Ad, Bd, Cd, Dd] = ssdata(sys_d);
 
-% Tiempo total y referencia
-t_sim = 1500;                  % tiempo total de simulacion [s]
-N_steps = round(t_sim/Ts);     % numero de pasos de control
-t_vec = (0:N_steps-1)*Ts;
+% Tiempo de simulacion y vector de referencia
+t_sim   = 1500;
+N_steps = round(t_sim/Ts);
+t_vec   = (0:N_steps-1)*Ts;
 
-% Setpoint para [h3; h4] (dentro del rango de operacion)
-% Cambio de referencia en t = 500s
 ref = zeros(ny, N_steps);
-ref(:,1:round(500/Ts))     = repmat([25; 25], 1, round(500/Ts));      % inicial
-ref(:,round(500/Ts)+1:end) = repmat([30; 20], 1, N_steps - round(500/Ts));  % nuevo SP
+k_ch = round(500/Ts);
+ref(:, 1:k_ch)       = repmat([25; 25], 1, k_ch);
+ref(:, k_ch+1:end)   = repmat([30; 20], 1, N_steps - k_ch);
 
 % Inicializacion
-h_real    = h0;                % planta NO lineal arranca en el punto de operacion
-u_actual  = [u10; u20];        % entrada actual = entrada estacionaria
-u_prev    = u_actual;          % u(k-1)
+h_real = h0;                 % planta NO lineal en variables absolutas
+u_prev = [u10; u20];         % u(k-1) en variables absolutas
 
-x_lin     = zeros(nx,1);       % estado del modelo lineal en desviacion (Dx = x - x0)
-x_lin_ant = x_lin;             % x(k-1) en desviacion
-y_lin_ant = Cd*x_lin;          % y(k-1) en desviacion
+H_log = zeros(4, N_steps); H_log(:,1) = h_real;
+U_log = zeros(nu, N_steps);
 
-% Historial para graficas
-H_log     = zeros(4, N_steps); H_log(:,1) = h_real;
-U_log     = zeros(nu, N_steps);
-Du_log    = zeros(nu, N_steps);
-ref_log   = ref;
-
-% Parametros del modelo no lineal (para ode45)
 params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
                 'a1',a1,'a2',a2,'a3',a3,'a4',a4, ...
                 'k1',k1,'k2',k2,'y1',y1,'y2',y2,'g',g);
@@ -282,65 +205,67 @@ params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
 opts_qp = optimoptions('quadprog','Display','off');
 
 for k = 1:N_steps-1
-    % ---- (1) Estado del modelo lineal en desviacion ---------------------
-    % Asumimos medicion completa del estado (puede sustituirse por un
-    % observador/Kalman si solo se mide y).
-    x_lin     = h_real - h0;                    % Dx_actual
-    Dx_lin    = x_lin - x_lin_ant;              % delta del estado
-    y_lin     = Cd*x_lin;                       % y en desviacion
-    xi        = [Dx_lin; y_lin];                % estado aumentado
+    % ---- (a) Estado en variables desviadas ------------------------------
+    x_des = h_real - h0;             % desviacion del estado
+    u_prev_des = u_prev - u0;        % desviacion de la entrada anterior
 
-    % ---- (2) Vector de referencia futuro (sin preview del setpoint) -----
-    % Se usa r(k) (setpoint ACTUAL), NO r(k+j) (futuro). Esto elimina la
-    % "anticipacion" del controlador: no sabra del cambio hasta que
-    % efectivamente ocurra. Es el caso realista en plantas industriales.
-    r_actual_dev = ref(:,k) - [h30; h40];      % setpoint ACTUAL en desviacion
-    W = repmat(r_actual_dev, N, 1);            % constante en todo el horizonte
-
-    % ---- (3) Construir restricciones que dependen de u_prev -------------
-    %   u_prev en desviacion (porque trabajamos con el modelo lineal)
-    Du_prev_dev = u_prev - u0;
-    b_ineq = [ Du_max_vec;
-              -Du_min_vec;
-               u_max_vec - ones_blk*u_prev;
-              -u_min_vec + ones_blk*u_prev ];
-
-    % ---- (4) Resolver QP -----------------------------------------------
-    %   J = 0.5*DU'*H*DU + f'*DU
-    f_qp = -2*(W - F*xi)'*Q*Phi;
-    f_qp = f_qp(:);
-
-    [DU, ~, exitflag] = quadprog(H, f_qp, A_ineq_static, b_ineq, ...
-                                 [], [], [], [], [], opts_qp);
-
-    if exitflag ~= 1
-        warning('QP no convergio en el paso %d (exitflag=%d)', k, exitflag);
-        DU = zeros(Nu*nu,1);
+    % ---- (b) Respuesta libre F (en desviacion) --------------------------
+    %  Se predice la trayectoria de las salidas asumiendo que NO se
+    %  aplican nuevos incrementos (Delta_u = 0 para j >= 0), por lo cual
+    %  u(k+i) = u(k-1) durante todo el horizonte.
+    %  Esta es la traduccion practica de la formulacion CARIMA, donde:
+    %     F_j(z^-1)*y(t) + [contribucion de Delta_u pasadas]
+    %  se obtiene como la propagacion del modelo a lazo abierto.
+    F_vec = zeros(ny*N, 1);
+    x_temp = x_des;
+    for j = 1:N
+        x_temp = Ad*x_temp + Bd*u_prev_des;
+        y_pred = Cd*x_temp;          % en desviacion
+        F_vec(j)     = y_pred(1);    % h3 - h30
+        F_vec(N + j) = y_pred(2);    % h4 - h40
     end
 
-    % ---- (5) Aplicar SOLO el primer incremento --------------------------
-    Du_aplicado = DU(1:nu);
+    % ---- (c) Vector de referencia futura (en desviacion) ----------------
+    %  Se usa el setpoint actual r(k); no hay anticipacion de cambios
+    %  futuros (principio de causalidad).
+    r_des = ref(:,k) - [h30; h40];
+    W = [repmat(r_des(1), N, 1); repmat(r_des(2), N, 1)];
+
+    % ---- (d) Vector lineal del QP ---------------------------------------
+    %  f_qp = 2*G' * Q * (F - W)
+    f_qp = 2*G'*Q*(F_vec - W);
+
+    % ---- (e) Vector de cotas de las restricciones -----------------------
+    u_prev_stack = [repmat(u_prev(1), Nu, 1); repmat(u_prev(2), Nu, 1)];
+    b_ineq = [ Du_max_vec;
+              -Du_min_vec;
+               u_max_vec - u_prev_stack;
+              -u_min_vec + u_prev_stack ];
+
+    % ---- (f) Resolucion del QP ------------------------------------------
+    [DU, ~, exitflag] = quadprog(H_qp, f_qp, A_ineq_static, b_ineq, ...
+                                 [], [], [], [], [], opts_qp);
+    if exitflag ~= 1
+        warning('QP no convergio en k=%d (exitflag=%d)', k, exitflag);
+        DU = zeros(nu*Nu, 1);
+    end
+
+    % ---- (g) Aplicar SOLO el primer incremento de cada canal -----------
+    Du_aplicado = [DU(1); DU(Nu + 1)];   % primer Du1, primer Du2
     u_actual    = u_prev + Du_aplicado;
+    u_actual    = max(min(u_actual, u_max), u_min);   % saturacion
 
-    % Saturacion de seguridad (defensiva; QP ya respeto los limites)
-    u_actual = max(min(u_actual, u_max), u_min);
+    U_log(:,k) = u_actual;
 
-    U_log(:,k)  = u_actual;
-    Du_log(:,k) = Du_aplicado;
-
-    % ---- (6) Simular la planta NO LINEAL un paso (de t a t+Ts) ----------
+    % ---- (h) Simular planta no lineal un paso de Ts ---------------------
     [~, h_traj] = ode45(@(t,h) modelo_nolineal(t,h,u_actual,params), ...
                         [0 Ts], h_real);
     h_real = h_traj(end,:)';
 
-    % ---- (7) Actualizar variables para la siguiente iteracion -----------
-    x_lin_ant = x_lin;
-    u_prev    = u_actual;
-    H_log(:,k+1) = h_real;
+    u_prev = u_actual;
+    H_log(:, k+1) = h_real;
 end
-
-% Ultimo paso log
-U_log(:,end)  = u_actual;
+U_log(:, end) = u_prev;
 
 %% ========================================================================
 %  8) GRAFICAS Y ANALISIS
@@ -349,18 +274,17 @@ figure('Name','GPC - Salidas controladas','NumberTitle','off')
 
 subplot(2,1,1)
 plot(t_vec, H_log(3,:), 'b', 'LineWidth', 1.5); hold on;
-stairs(t_vec, ref_log(1,:), 'r--', 'LineWidth', 1.2);
+stairs(t_vec, ref(1,:), 'r--', 'LineWidth', 1.2);
 ylabel('h_3 (cm)'); xlabel('Tiempo (s)');
 legend('h_3 medido','Referencia','Location','best');
 title('Tanque 3 (controlado)'); grid on;
 
 subplot(2,1,2)
 plot(t_vec, H_log(4,:), 'b', 'LineWidth', 1.5); hold on;
-stairs(t_vec, ref_log(2,:), 'r--', 'LineWidth', 1.2);
+stairs(t_vec, ref(2,:), 'r--', 'LineWidth', 1.2);
 ylabel('h_4 (cm)'); xlabel('Tiempo (s)');
 legend('h_4 medido','Referencia','Location','best');
 title('Tanque 4 (controlado)'); grid on;
-
 sgtitle('GPC multivariable sobre planta no lineal');
 
 figure('Name','GPC - Senales de control','NumberTitle','off')
@@ -388,7 +312,7 @@ ylabel('h_2 (cm)'); xlabel('Tiempo (s)');
 title('Tanque 2 (no controlado)'); grid on;
 
 %% ========================================================================
-%  FUNCION DEL MODELO NO LINEAL (planta real para simular)
+%  FUNCION DEL MODELO NO LINEAL (planta real)
 % ========================================================================
 function dhdt = modelo_nolineal(~, h, u, p)
     h1 = max(h(1),0); h2 = max(h(2),0);

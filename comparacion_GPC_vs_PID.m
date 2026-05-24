@@ -45,41 +45,55 @@ Cc = [0 0 1 0; 0 0 0 1]; Dc = zeros(2,2);
 Ts = 2; N = 50; Nu = 9;
 delta  = [10 10];
 lambda = [0.0076803 0.0076803];
-alpha = 0.7;          % trayectoria de referencia (sin preview)
 
 % Discretizacion
 sys_d = c2d(ss(Ac,Bc,Cc,Dc), Ts, 'zoh');
 [Ad, Bd, Cd, ~] = ssdata(sys_d);
-nx = size(Ad,1); nu = size(Bd,2); ny = size(Cd,1);
+nu = size(Bd,2); ny = size(Cd,1);
 
-% Modelo aumentado
-A_t = [Ad zeros(nx,ny); Cd*Ad eye(ny)];
-B_t = [Bd; Cd*Bd];
-C_t = [zeros(ny,nx) eye(ny)];
-
-% Matrices de prediccion
-F   = zeros(N*ny, nx+ny);
-Phi = zeros(N*ny, Nu*nu);
-for j=1:N, F((j-1)*ny+1:j*ny,:) = C_t*A_t^j; end
-for ii=1:N
-    for jj=1:Nu
-        if ii>=jj
-            Phi((ii-1)*ny+1:ii*ny, (jj-1)*nu+1:jj*nu) = C_t*A_t^(ii-jj)*B_t;
-        end
+% Coeficientes de respuesta al escalon y matriz dinamica G (formulacion GPC)
+G_z = tf(sys_d);
+t_step = (0:N)*Ts;
+g_step = cell(ny, nu);
+for i = 1:ny
+    for j = 1:nu
+        y_step_ij = step(G_z(i,j), t_step);
+        g_step{i,j} = y_step_ij(2:end);
     end
 end
 
-Q = kron(eye(N), diag(delta));
-R = kron(eye(Nu), diag(lambda));
-H = 2*(Phi'*Q*Phi + R); H = (H+H')/2;
+G = zeros(ny*N, nu*Nu);
+for i = 1:ny
+    for j = 1:nu
+        G_block = zeros(N, Nu);
+        for r = 1:N
+            for c = 1:Nu
+                if r >= c
+                    G_block(r,c) = g_step{i,j}(r-c+1);
+                end
+            end
+        end
+        G((i-1)*N + (1:N), (j-1)*Nu + (1:Nu)) = G_block;
+    end
+end
+
+% Pesos y Hessiano
+Q = blkdiag(delta(1)*eye(N),  delta(2)*eye(N));
+R = blkdiag(lambda(1)*eye(Nu), lambda(2)*eye(Nu));
+H_qp = 2*(G'*Q*G + R); H_qp = (H_qp+H_qp')/2;
 
 % Restricciones
 Du_max=[100;100]; u_max=u0*2; u_min=[0;0];
-T_mat = kron(tril(ones(Nu)), eye(nu));
-ones_blk = repmat(eye(nu), Nu, 1);
-A_ineq = [eye(Nu*nu); -eye(Nu*nu); T_mat; -T_mat];
-Du_max_v = repmat(Du_max,Nu,1); Du_min_v = -Du_max_v;
-u_max_v = repmat(u_max,Nu,1); u_min_v = repmat(u_min,Nu,1);
+Du_min = -Du_max;
+
+Du_max_vec = [repmat(Du_max(1),Nu,1); repmat(Du_max(2),Nu,1)];
+Du_min_vec = [repmat(Du_min(1),Nu,1); repmat(Du_min(2),Nu,1)];
+u_max_vec  = [repmat(u_max(1),Nu,1);  repmat(u_max(2),Nu,1)];
+u_min_vec  = [repmat(u_min(1),Nu,1);  repmat(u_min(2),Nu,1)];
+
+Tri_one = tril(ones(Nu));
+T_mat = blkdiag(Tri_one, Tri_one);
+A_ineq = [eye(nu*Nu); -eye(nu*Nu); T_mat; -T_mat];
 
 % Mismo escenario que el PID
 t_sim = 1500; N_steps = round(t_sim/Ts);
@@ -88,7 +102,7 @@ ref = zeros(2,N_steps);
 ref(:,1:round(500/Ts))     = repmat([25;25],1,round(500/Ts));
 ref(:,round(500/Ts)+1:end) = repmat([30;20],1,N_steps - round(500/Ts));
 
-h_real = h0; u_prev = u0; x_lin_ant = zeros(nx,1);
+h_real = h0; u_prev = u0;
 H_log_GPC = zeros(4,N_steps); H_log_GPC(:,1) = h_real;
 U_log_GPC = zeros(2,N_steps);
 
@@ -99,35 +113,42 @@ opts = optimoptions('quadprog','Display','off');
 
 fprintf('Ejecutando GPC...\n');
 for k=1:N_steps-1
-    x_lin = h_real - h0;
-    Dx = x_lin - x_lin_ant;
-    y_lin = Cd*x_lin;
-    xi = [Dx; y_lin];
+    x_des = h_real - h0;
+    u_prev_des = u_prev - u0;
 
-    y_act_dev = h_real(3:4) - [h30;h40];
-    r_act_dev = ref(:,k) - [h30;h40];
-    W = zeros(N*ny,1);
-    for j=1:N
-        w_j = alpha^j*y_act_dev + (1-alpha^j)*r_act_dev;
-        W((j-1)*ny+1:j*ny) = w_j;
+    % Respuesta libre F (en desviacion)
+    F_vec = zeros(ny*N, 1);
+    x_temp = x_des;
+    for j = 1:N
+        x_temp = Ad*x_temp + Bd*u_prev_des;
+        y_pred = Cd*x_temp;
+        F_vec(j)     = y_pred(1);
+        F_vec(N + j) = y_pred(2);
     end
 
-    b_ineq = [Du_max_v; -Du_min_v;
-              u_max_v - ones_blk*u_prev;
-              -u_min_v + ones_blk*u_prev];
+    % Referencia futura constante (setpoint actual)
+    r_des = ref(:,k) - [h30;h40];
+    W = [repmat(r_des(1),N,1); repmat(r_des(2),N,1)];
 
-    f_qp = -2*(W - F*xi)'*Q*Phi; f_qp = f_qp(:);
-    [DU,~,ef] = quadprog(H, f_qp, A_ineq, b_ineq, [],[],[],[],[],opts);
-    if ef~=1, DU = zeros(Nu*nu,1); end
+    % QP
+    f_qp = 2*G'*Q*(F_vec - W);
+    u_prev_stack = [repmat(u_prev(1),Nu,1); repmat(u_prev(2),Nu,1)];
+    b_ineq = [Du_max_vec; -Du_min_vec;
+              u_max_vec - u_prev_stack;
+              -u_min_vec + u_prev_stack];
 
-    u_act = u_prev + DU(1:nu);
+    [DU,~,ef] = quadprog(H_qp, f_qp, A_ineq, b_ineq, [],[],[],[],[],opts);
+    if ef~=1, DU = zeros(nu*Nu,1); end
+
+    % Primer incremento de cada canal
+    Du_aplicado = [DU(1); DU(Nu+1)];
+    u_act = u_prev + Du_aplicado;
     u_act = max(min(u_act,u_max),u_min);
     U_log_GPC(:,k) = u_act;
 
     [~, h_traj] = ode45(@(t,h) modelo_nl(t,h,u_act,params), [0 Ts], h_real);
     h_real = h_traj(end,:)';
 
-    x_lin_ant = x_lin;
     u_prev = u_act;
     H_log_GPC(:,k+1) = h_real;
 end
