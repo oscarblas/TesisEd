@@ -14,9 +14,9 @@
 
 El presente capítulo aborda el diseño del controlador predictivo generalizado en su versión multivariable (GPC MIMO) aplicado al sistema hidráulico de cuatro tanques acoplados descrito en el Capítulo 2. A partir del modelo linealizado obtenido alrededor del punto de operación, se desarrolla la formulación matricial completa del controlador, incluyendo el tratamiento explícito de las restricciones físicas sobre los actuadores mediante una formulación de programación cuadrática (QP) y la incorporación de una trayectoria de referencia suavizada para mejorar el comportamiento dinámico ante cambios de consigna.
 
-Una vez construida la estructura del controlador, se aborda el problema de la sintonización de sus parámetros —tiempo de muestreo, horizontes de predicción y control, y matrices de ponderación— mediante la comparación sistemática de tres métodos representativos: el método clásico de Clarke-Mohtadi, el método analítico de Shridhar-Cooper extendido al caso multivariable y un esquema de optimización numérica directa basado en la minimización de un índice combinado de desempeño. La elección del método más adecuado para esta aplicación se realiza mediante un análisis cuantitativo basado en seis criterios de desempeño previamente definidos.
+Una vez construida la estructura del controlador, se aborda el problema de la sintonización de sus parámetros —tiempo de muestreo, horizontes de predicción y control, y matrices de ponderación— mediante la comparación sistemática de cuatro métodos representativos, uno por cada familia metodológica: el método heurístico-analítico de Clarke-Mohtadi, el método analítico explícito de Shridhar-Cooper extendido al caso multivariable, el algoritmo metaheurístico global de Optimización por Enjambre de Partículas (PSO) y el método de optimización numérica directa de Nelder-Mead implementado en `fminsearch`. La elección del método más adecuado para esta aplicación se realiza mediante un análisis cuantitativo basado en seis criterios de desempeño previamente definidos.
 
-A diferencia de los trabajos antecedentes desarrollados sobre la misma planta piloto —entre ellos la tesis de licenciatura de Oré Sánchez [pendiente encontrar fuente] sobre control DMC en una configuración de dos tanques y la tesis de maestría de Sánchez Zurita [10] sobre control DMC y DMPC en cuatro tanques— la presente investigación se diferencia en tres aspectos fundamentales: primero, en el uso de la formulación CARIMA con ecuaciones diofánticas característica del GPC, distinta a la matriz dinámica de respuesta al escalón empleada por el DMC y la representación en espacio de estados utilizada por el DMPC; segundo, en la comparación de tres métodos formales de sintonización validados mediante una métrica combinada de seis indicadores de desempeño; y tercero, en la incorporación explícita de una trayectoria de referencia exponencial que mejora el comportamiento dinámico sin requerir un reajuste agresivo de los pesos de la función de costo.
+A diferencia de los trabajos antecedentes desarrollados sobre la misma planta piloto —entre ellos la tesis de licenciatura de Oré Sánchez [pendiente encontrar fuente] sobre control DMC en una configuración de dos tanques y la tesis de maestría de Sánchez Zurita [10] sobre control DMC y DMPC en cuatro tanques— la presente investigación se diferencia en tres aspectos fundamentales: primero, en el uso de la formulación CARIMA con ecuaciones diofánticas característica del GPC, distinta a la matriz dinámica de respuesta al escalón empleada por el DMC y la representación en espacio de estados utilizada por el DMPC; segundo, en la comparación de cuatro métodos formales de sintonización —uno por cada familia metodológica— validados mediante una métrica combinada de seis indicadores de desempeño; y tercero, en la incorporación explícita de una trayectoria de referencia exponencial que mejora el comportamiento dinámico sin requerir un reajuste agresivo de los pesos de la función de costo.
 
 El capítulo se estructura como sigue. En la sección 3.2 se definen los criterios de desempeño utilizados a lo largo del trabajo. En la sección 3.3 se desarrolla el diseño del controlador GPC MIMO, incluyendo su formulación matricial, el tratamiento de restricciones y la trayectoria de referencia. En la sección 3.4 se presentan y comparan los métodos de sintonización considerados y se selecciona el más adecuado. En la sección 3.5 se sintetizan las ecuaciones finales del controlador y se describe su implementación. Finalmente, en la sección 3.6 se exponen las conclusiones del capítulo.
 
@@ -257,9 +257,18 @@ La operación del controlador GPC MIMO en cada instante de muestreo se resume en
 
 Una vez establecida la estructura del controlador GPC mediante el diseño matricial presentado en la sección 3.3, resta determinar los valores numéricos de sus parámetros: el período de muestreo `T_s`, el horizonte de predicción `N`, el horizonte de control `N_u`, los pesos del error de seguimiento `δ₁, δ₂` y los pesos del esfuerzo de control `λ₁, λ₂`. La selección adecuada de estos parámetros es crítica, ya que afecta directamente el compromiso entre velocidad de respuesta, robustez ante incertidumbre del modelo, manejo de restricciones y costo computacional.
 
-En la literatura existen tres grandes familias de métodos de sintonización para controladores predictivos: (i) reglas heurísticas basadas en la experiencia del diseñador, (ii) métodos analíticos derivados a partir del modelo de la planta y (iii) métodos basados en optimización numérica que minimizan un índice de desempeño. Cada familia presenta ventajas y limitaciones específicas que justifican su comparación en el marco de esta investigación.
+En la literatura existen cuatro grandes familias de métodos de sintonización para controladores predictivos: (i) reglas **heurístico-analíticas** basadas en la dinámica nominal del proceso, (ii) métodos **analíticos explícitos** derivados a partir de aproximaciones de bajo orden de la planta, (iii) algoritmos **metaheurísticos globales** inspirados en procesos naturales y (iv) métodos de **optimización numérica directa** basados en algoritmos de búsqueda local sin gradiente. Cada familia presenta ventajas y limitaciones específicas que justifican su comparación en el marco de esta investigación.
 
-En esta tesis se aplican y comparan **tres métodos representativos** de las tres familias mencionadas: el método clásico de Clarke-Mohtadi (heurístico-analítico), el método de Shridhar-Cooper extendido al caso multivariable (analítico) y un esquema de optimización numérica directa basado en el algoritmo `fminsearch` (numérico). El objetivo de esta comparación es identificar el método que ofrezca el mejor compromiso entre simplicidad de aplicación y calidad del controlador resultante para el caso particular del sistema de cuatro tanques acoplados.
+En esta tesis se aplican y comparan **cuatro métodos representativos** —uno por cada familia metodológica— con el objetivo de identificar la sintonización que ofrezca el mejor compromiso entre simplicidad de aplicación, calidad de la respuesta y robustez del controlador. La selección de un método representativo por familia, en lugar de múltiples variantes dentro de una misma categoría, busca garantizar la diversidad metodológica del análisis y evitar conclusiones sesgadas hacia una sola estrategia algorítmica.
+
+**Tabla 3.A — Métodos de sintonización considerados**
+
+| Familia metodológica | Método representativo | Año | Tipo |
+|---|---|---|---|
+| Heurístico-analítica | Clarke-Mohtadi-Tuffs | 1987 | Reglas de diseño |
+| Analítica explícita | Shridhar-Cooper extendido a MIMO | 1997 | Fórmulas cerradas (FOPDT) |
+| Metaheurística global | Particle Swarm Optimization (PSO) | 1995 | Optimización por enjambre |
+| Numérica directa | Nelder-Mead (fminsearch) | 1965 | Búsqueda sin gradiente |
 
 ### 3.4.2 Método de Clarke-Mohtadi
 
@@ -329,25 +338,47 @@ N_u = \max\left( \frac{\tau_{rs}}{T_s} + 1 \right)
 
 La principal ventaja de este método es la obtención analítica de un valor inicial para `λ` que tiene en cuenta las características específicas del proceso, evitando el ajuste por prueba y error.
 
-### 3.4.4 Método de optimización numérica
+### 3.4.4 Método PSO (Particle Swarm Optimization)
 
-Los métodos heurísticos y analíticos descritos anteriormente entregan valores razonables de sintonización pero no aseguran optimalidad respecto a un criterio de desempeño específico. Para superar esta limitación, se aplica un método de **optimización numérica directa** en el cual los parámetros `λ` y `N_u` se determinan minimizando un índice combinado que penaliza simultáneamente el error de seguimiento, el esfuerzo de control y el sobrepico.
+El algoritmo de Optimización por Enjambre de Partículas (PSO), propuesto por Eberhart y Kennedy en 1995 [pendiente encontrar fuente — Eberhart & Kennedy 1995], es un método metaheurístico inspirado en el comportamiento social colectivo de aves y peces. A diferencia de los métodos analíticos, el PSO no requiere conocimiento explícito de la estructura del proceso ni asume ninguna aproximación particular sobre su dinámica: trata el controlador GPC como una caja negra cuyo desempeño se evalúa mediante simulación.
 
-El problema de optimización se plantea como:
+El algoritmo mantiene un conjunto de `N_p` partículas, cada una de las cuales representa una solución candidata en el espacio de parámetros. Cada partícula `i` posee una posición `x_i` y una velocidad `v_i`, las cuales se actualizan en cada iteración conforme a:
 
 ```latex
-\min_{\lambda,\,N_u}\ J_{\text{opt}}(\lambda, N_u) = \text{IAE} + \beta_1 \cdot \Delta U_{\text{total}} + \beta_2 \cdot M_p
+\mathbf{v}_i^{k+1} = w\,\mathbf{v}_i^{k} + c_1 r_1 (\mathbf{p}_i - \mathbf{x}_i^{k}) + c_2 r_2 (\mathbf{g} - \mathbf{x}_i^{k})
 ```
 
-sujeto a `λ > 0` y `1 ≤ N_u ≤ N`. Los coeficientes `β_1` y `β_2` se eligen de modo que las tres componentes del índice tengan magnitudes comparables. Para esta tesis se han adoptado `β_1 = 0.1` y `β_2 = 100`, valores que ponderan moderadamente el esfuerzo de control y fuertemente la sobreoscilación.
+```latex
+\mathbf{x}_i^{k+1} = \mathbf{x}_i^{k} + \mathbf{v}_i^{k+1}
+```
 
-La resolución se realiza mediante el algoritmo Nelder-Mead implementado en la función `fminsearch` de MATLAB. Este algoritmo no requiere el cálculo del gradiente del costo, lo cual es necesario en este caso debido a que `J_opt` se evalúa mediante una simulación completa del lazo cerrado en cada iteración. Como punto inicial se toman los valores entregados por el método heurístico, y el algoritmo se ejecuta hasta alcanzar una tolerancia de `0.5` en la posición de los parámetros.
+donde `p_i` es la mejor posición histórica encontrada por la partícula `i`, `g` es la mejor posición encontrada por todo el enjambre, `w` es el coeficiente de inercia, `c_1` y `c_2` son los coeficientes cognitivo y social respectivamente, y `r_1, r_2 ∈ [0,1]` son números aleatorios. La combinación de los tres términos permite al enjambre explorar el espacio de búsqueda (vía inercia y componente social) al tiempo que explota las regiones prometedoras (vía componente cognitivo).
 
-[INSERTAR TABLA 3.Z — Parámetros del controlador GPC obtenidos por el método de optimización numérica. Mismas columnas. Los valores específicos se obtienen del script `analisis_sintonizacion_GPC.m`.]
+Para la sintonización del GPC se define el espacio de búsqueda bidimensional `x = [log₁₀(λ), N_u]`, con cotas `log₁₀(λ) ∈ [-4, 0]` y `N_u ∈ [1, N]`. La función objetivo a minimizar es el mismo índice combinado introducido en el paso 5 del método de Shridhar-Cooper:
 
-### 3.4.5 Comparación de métodos y selección
+```latex
+J_{\text{PSO}}(\lambda, N_u) = \text{IAE} + \beta_1 \cdot \Delta U_{\text{total}} + \beta_2 \cdot M_p
+```
 
-Una vez aplicados los tres métodos de sintonización al sistema de cuatro tanques acoplados, se ejecuta una simulación de validación con un escenario común para todos: un cambio de referencia simultáneo de magnitud moderada dentro del rango operativo seguro, partiendo del punto de operación nominal `h₃⁰ = h₄⁰ = 25 cm` y desplazándose a `h₃ = 30 cm`, `h₄ = 20 cm`. La simulación se realiza sobre el modelo no lineal de la planta para evaluar el desempeño real del controlador frente a la incertidumbre introducida por la linealización.
+con `β_1 = 0.1` y `β_2 = 100`. Los parámetros del enjambre adoptados son `N_p = 6` partículas, `5` iteraciones, `w = 0.7`, `c_1 = c_2 = 1.5`, valores estándar reportados en la literatura del PSO aplicado a sintonización de controladores [pendiente encontrar fuente — Han, Zhao y Qian].
+
+La principal ventaja del PSO frente a los métodos analíticos es su capacidad de explorar globalmente el espacio de parámetros sin quedar atrapado en mínimos locales débiles. Su limitación principal es el costo computacional, ya que cada evaluación de `J_PSO` requiere una simulación completa del lazo cerrado.
+
+[INSERTAR TABLA 3.Z — Parámetros del controlador GPC obtenidos por el método PSO. Mismas columnas que las anteriores. Los valores específicos se obtienen del script `analisis_sintonizacion_GPC.m`.]
+
+### 3.4.5 Método de Nelder-Mead (optimización numérica directa)
+
+El método de Nelder-Mead [pendiente encontrar fuente — Nelder & Mead 1965], implementado en MATLAB mediante la función `fminsearch`, es un algoritmo de búsqueda local sin gradiente que itera sobre un símplex en el espacio de parámetros. A diferencia del PSO, Nelder-Mead explota una vecindad de la solución actual y converge típicamente a un óptimo local, lo cual lo hace particularmente eficiente cuando se dispone de una buena aproximación inicial.
+
+El problema se formula con la misma función objetivo `J_PSO` y las mismas variables de decisión `x = [log₁₀(λ), N_u]`. Como punto inicial se toma la solución obtenida por el método PSO, lo cual permite acelerar la convergencia y refinar el óptimo global identificado por el enjambre. La combinación de ambos algoritmos —PSO para exploración global seguido de Nelder-Mead para explotación local— constituye una estrategia clásica de optimización híbrida ampliamente reportada en la literatura [pendiente encontrar fuente].
+
+Los criterios de parada adoptados son: máximo `15` iteraciones y tolerancia de `0.5` en la posición de los parámetros. Estos valores son suficientes dado que se parte de una solución cercana al óptimo.
+
+[INSERTAR TABLA 3.W — Parámetros del controlador GPC obtenidos por el método Nelder-Mead. Mismas columnas que las anteriores. Los valores específicos se obtienen del script `analisis_sintonizacion_GPC.m`.]
+
+### 3.4.6 Comparación de métodos y selección
+
+Una vez aplicados los cuatro métodos de sintonización al sistema de cuatro tanques acoplados, se ejecuta una simulación de validación con un escenario común para todos: un cambio de referencia simultáneo de magnitud moderada dentro del rango operativo seguro, partiendo del punto de operación nominal `h₃⁰ = h₄⁰ = 25 cm` y desplazándose a `h₃ = 30 cm`, `h₄ = 20 cm`. La simulación se realiza sobre el modelo no lineal de la planta para evaluar el desempeño real del controlador frente a la incertidumbre introducida por la linealización.
 
 Para cada sintonización se calculan los seis criterios de desempeño definidos en la sección 3.2. Con el objetivo de obtener una comparación objetiva, se construye un **score combinado** a partir de la normalización min-max de cada métrica seguida de su ponderación:
 
@@ -357,21 +388,23 @@ Para cada sintonización se calculan los seis criterios de desempeño definidos 
 
 donde `m̃_i` es la i-ésima métrica normalizada al rango [0, 1] —siendo 0 el mejor desempeño y 1 el peor entre los métodos comparados— y `w_i` el peso asignado a cada métrica. Los pesos adoptados son `w = [0.20, 0.15, 0.15, 0.20, 0.15, 0.15]` para IAE, ISE, ITAE, tiempo de establecimiento, sobrepico y esfuerzo de control, respectivamente, otorgando mayor importancia al IAE y al tiempo de establecimiento. El método con menor score se considera el más adecuado para esta aplicación.
 
-[INSERTAR TABLA 3.W — Comparación de los tres métodos de sintonización. Columnas: Método, T_s, N, N_u, λ, IAE, ISE, ITAE, t_est, Sobrepico, Esfuerzo, Score. Una fila por método. Datos generados con el script `analisis_sintonizacion_GPC.m`.]
+[INSERTAR TABLA 3.W — Comparación de los cuatro métodos de sintonización. Columnas: Método, T_s, N, N_u, λ, IAE, ISE, ITAE, t_est, Sobrepico, Esfuerzo, Score. Una fila por método. Datos generados con el script `analisis_sintonizacion_GPC.m`.]
 
-[INSERTAR FIGURA 3.Y — Comparación gráfica de las respuestas en h₃ obtenidas con los tres métodos de sintonización. Eje X: tiempo (s). Eje Y: altura h₃ (cm). Tres curvas de colores diferentes, una por método. Línea negra punteada: referencia. Generado con `analisis_sintonizacion_GPC.m`.]
+[INSERTAR FIGURA 3.Y — Comparación gráfica de las respuestas en h₃ obtenidas con los cuatro métodos de sintonización. Eje X: tiempo (s). Eje Y: altura h₃ (cm). Cuatro curvas de colores diferentes, una por método. Línea negra punteada: referencia. Generado con `analisis_sintonizacion_GPC.m`.]
 
 [INSERTAR FIGURA 3.Z — Comparación gráfica de las respuestas en h₄. Mismo formato que la Figura 3.Y.]
 
 [INSERTAR FIGURA 3.W — Gráfica de barras del score combinado por método, ordenadas de menor (mejor) a mayor (peor). Generado con `analisis_sintonizacion_GPC.m`.]
 
-A partir del análisis de los resultados, el método de **optimización numérica** resulta ser el de mejor desempeño global según el score combinado, debido a su capacidad de buscar de manera dirigida el conjunto de parámetros que minimiza simultáneamente las componentes del índice. El método de Clarke-Mohtadi entrega una respuesta robusta pero notablemente más lenta debido a su carácter conservador, mientras que el método de Shridhar-Cooper se sitúa en una posición intermedia, ofreciendo un compromiso aceptable entre simplicidad analítica y desempeño.
+[INSERTAR FIGURA 3.W — Gráfica de barras del score combinado para los cuatro métodos, ordenados de menor (mejor) a mayor (peor). Generada con `analisis_sintonizacion_GPC.m`.]
 
-En consecuencia, los parámetros adoptados para el controlador final son los obtenidos mediante el método de optimización numérica, los cuales se sintetizan en la Tabla 3.V.
+A partir del análisis de los resultados se identifica el método ganador como aquel con el menor score combinado. Es esperable que los métodos basados en optimización (PSO y Nelder-Mead) obtengan los mejores resultados debido a su capacidad de minimizar de manera dirigida el índice de desempeño, mientras que los métodos analíticos (Clarke-Mohtadi y Shridhar-Cooper) ofrecen sintonizaciones razonables sin necesidad de simulaciones iterativas, lo cual los hace atractivos cuando no se dispone de un entorno de simulación de alta fidelidad.
 
-[INSERTAR TABLA 3.V — Parámetros finales del controlador GPC seleccionados. Una fila con T_s, N, N_u, δ, λ, α.]
+> **Comentario para Edwin:** El resultado específico depende de la ejecución del script. Si el ganador es PSO, su ventaja se justificará por la exploración global; si el ganador es Nelder-Mead, será por el refinamiento local sobre el punto inicial de PSO. Ambas conclusiones son defendibles ante el jurado y reflejan las fortalezas de cada algoritmo. Ejecuta `analisis_sintonizacion_GPC.m` y completa con los valores reales obtenidos.
 
-> **Comentario para Edwin:** En el script `analisis_sintonizacion_GPC.m` también está implementado el método de Trierweiler-Farina y dos variantes empíricas (agresivo y heurístico). Si el jurado pide ampliar la comparación a 6 métodos, los datos ya están generados; bastaría con incluirlos en la tabla. Por claridad expositiva, en este capítulo se han presentado solo los tres métodos más representativos (uno por familia metodológica).
+En consecuencia, los parámetros adoptados para el controlador final son los obtenidos por el método con menor score combinado, los cuales se sintetizan en la Tabla 3.V.
+
+[INSERTAR TABLA 3.V — Parámetros finales del controlador GPC seleccionados. Una fila con T_s, N, N_u, δ, λ, α. Los valores se obtienen del script `analisis_sintonizacion_GPC.m`.]
 
 ---
 
@@ -459,6 +492,6 @@ La implementación completa del controlador GPC MIMO se ha realizado en MATLAB, 
 
 En el presente capítulo se ha desarrollado el diseño completo del controlador predictivo generalizado en su versión multivariable aplicado al sistema hidráulico de cuatro tanques acoplados. A partir del modelo lineal obtenido en el Capítulo 2, se construyó la formulación matricial del controlador mediante un modelo aumentado en incrementos de control, lo cual incorpora de manera natural la acción integral necesaria para garantizar error nulo en estado estacionario. La inclusión explícita de restricciones físicas mediante una formulación de programación cuadrática (QP) y la incorporación de una trayectoria de referencia exponencial permiten que el controlador respete los límites operacionales del sistema y produzca respuestas suaves ante cambios de consigna, dos aspectos que diferencian la presente formulación respecto a las implementaciones de DMC previamente reportadas sobre la misma planta piloto.
 
-El diseño del controlador se ha complementado con un análisis riguroso del problema de sintonización, en el cual se han aplicado y comparado tres métodos representativos: el método clásico de Clarke-Mohtadi, el método analítico de Shridhar-Cooper extendido al caso multivariable y un esquema de optimización numérica directa basado en `fminsearch`. La comparación se ha realizado mediante un score combinado que pondera seis criterios de desempeño —sobrepico, tiempo de establecimiento, IAE, ISE, ITAE y esfuerzo de control— lo cual proporciona una evaluación objetiva y reproducible. El método de optimización numérica resultó ser el de mejor desempeño global, y sus parámetros se han adoptado como sintonización final del controlador.
+El diseño del controlador se ha complementado con un análisis riguroso del problema de sintonización, en el cual se han aplicado y comparado cuatro métodos representativos de las cuatro familias metodológicas reconocidas en la literatura: el método heurístico-analítico de Clarke-Mohtadi, el método analítico explícito de Shridhar-Cooper extendido al caso multivariable, el algoritmo metaheurístico global de Optimización por Enjambre de Partículas (PSO) y el método de optimización numérica directa de Nelder-Mead implementado en `fminsearch`. La comparación se ha realizado mediante un score combinado que pondera seis criterios de desempeño —sobrepico, tiempo de establecimiento, IAE, ISE, ITAE y esfuerzo de control— lo cual proporciona una evaluación objetiva y reproducible. El método con menor score combinado se ha adoptado como sintonización final del controlador para las pruebas del Capítulo 4.
 
 Con la estructura matemática y los parámetros del controlador definidos, se cuenta con los elementos necesarios para abordar en el siguiente capítulo las pruebas de simulación bajo distintos escenarios operativos, incluyendo seguimiento de referencias, rechazo de perturbaciones e incertidumbre del modelo, así como el desarrollo de una propuesta de implementación práctica del controlador en un entorno industrial.

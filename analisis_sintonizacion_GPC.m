@@ -3,13 +3,15 @@
 %  Comparacion y ranking de metodos de sintonizacion para el GPC MIMO
 %  Sistema de 4 tanques acoplados
 %
-%  Metodos comparados:
-%   1. Clarke-Mohtadi (1989)        - reglas clasicas conservadoras
-%   2. Shridhar-Cooper (1997)       - lambda analitico via modelo FOPDT
-%   3. Trierweiler-Farina           - basado en numero de condicion
-%   4. Heuristico empirico          - reglas practicas con buen trade-off
-%   5. Sintonizacion agresiva       - lambda muy bajo, alta velocidad
-%   6. Optimizacion numerica        - fminsearch sobre indice IAE+esfuerzo
+%  Metodos comparados (uno por cada familia metodologica):
+%   1. Clarke-Mohtadi (1987)   - HEURISTICO-ANALITICO
+%      Reglas practicas derivadas por los autores originales del GPC.
+%   2. Shridhar-Cooper (1997)  - ANALITICO EXPLICITO
+%      Formulas cerradas para lambda basadas en aproximacion FOPDT.
+%   3. PSO (Eberhart-Kennedy)  - METAHEURISTICO GLOBAL
+%      Optimizacion por enjambre de particulas sobre indice combinado.
+%   4. Nelder-Mead/fminsearch  - NUMERICO DIRECTO
+%      Optimizacion sin gradiente sobre indice combinado.
 %
 %  Indices de desempeno calculados para cada metodo:
 %   - IAE  (Integral del Absolute Error)
@@ -107,36 +109,39 @@ metodos{2} = struct('nombre','Shridhar-Cooper', ...
     'delta',  [1 1], ...
     'lambda', [lambda_sc lambda_sc]);
 
-% --- Metodo 3: Trierweiler-Farina --------------------------------------
-% Usa el numero de condicion de la matriz dinamica para escoger lambda
-% lambda ~ k_cond_objetivo  (regla simplificada)
-Ts_tf = round(T_dom/10); if Ts_tf<1, Ts_tf=1; end
-metodos{3} = struct('nombre','Trierweiler-Farina', ...
-    'Ts', Ts_tf, ...
-    'N',  round(1.5*T_dom/Ts_tf), ...
-    'Nu', 5, ...
-    'delta',  [1 1], ...
-    'lambda', [0.1 0.1]);
+% --- Metodo 3: PSO (Particle Swarm Optimization) ----------------------
+% Eberhart y Kennedy (1995). Optimizacion metaheuristica que busca el
+% optimo global de [log10(lambda), Nu] sobre el indice combinado.
+fprintf('Ejecutando PSO (puede tardar)...\n');
+Ts_pso = 2;
+N_pso  = 50;
+delta_pso = [10 10];
 
-% --- Metodo 4: Heuristico empirico (lo que tenias antes) --------------
-metodos{4} = struct('nombre','Heuristico empirico', ...
-    'Ts', 2, ...
-    'N',  50, ...
-    'Nu', 10, ...
-    'delta',  [10 10], ...
-    'lambda', [0.01 0.01]);
+obj_pso = @(x) costo_optimizacion(x, Ts_pso, N_pso, delta_pso, planta, escenario);
 
-% --- Metodo 5: Sintonizacion agresiva ---------------------------------
-metodos{5} = struct('nombre','Agresivo', ...
-    'Ts', 1, ...
-    'N',  60, ...
-    'Nu', 15, ...
-    'delta',  [50 50], ...
-    'lambda', [0.001 0.001]);
+% Parametros del enjambre
+pso_opts = struct('N_particles', 6, 'N_iters', 5, ...
+                  'w', 0.7, 'c1', 1.5, 'c2', 1.5);
+lb_pso = [log10(1e-4), 1];     % [log10(lambda_min), Nu_min]
+ub_pso = [log10(1),   N_pso];  % [log10(lambda_max), Nu_max]
 
-% --- Metodo 6: Optimizacion numerica (fminsearch) ---------------------
-% Optimizamos [log10(lambda), Nu] minimizando un costo combinado
-fprintf('Ejecutando optimizacion numerica (puede tardar)...\n');
+[x_pso, ~] = pso_simple(obj_pso, 2, lb_pso, ub_pso, pso_opts);
+
+lambda_pso = 10^x_pso(1);
+Nu_pso = max(round(x_pso(2)), 1);
+
+metodos{3} = struct('nombre','PSO', ...
+    'Ts', Ts_pso, ...
+    'N',  N_pso, ...
+    'Nu', Nu_pso, ...
+    'delta',  delta_pso, ...
+    'lambda', [lambda_pso lambda_pso]);
+
+% --- Metodo 4: Nelder-Mead via fminsearch ------------------------------
+% Optimizacion numerica directa (sin gradiente) sobre el mismo indice
+% combinado utilizado en PSO, partiendo de la solucion entregada por PSO
+% para acelerar la convergencia.
+fprintf('Ejecutando fminsearch (Nelder-Mead)...\n');
 Ts_opt = 2;
 N_opt  = 50;
 delta_opt = [10 10];
@@ -149,7 +154,7 @@ x_opt = fminsearch(obj, x0, opciones);
 lambda_optim = 10^x_opt(1);
 Nu_optim = max(round(x_opt(2)),1);
 
-metodos{6} = struct('nombre','Optimizacion numerica', ...
+metodos{4} = struct('nombre','Nelder-Mead (fminsearch)', ...
     'Ts', Ts_opt, ...
     'N',  N_opt, ...
     'Nu', Nu_optim, ...
@@ -440,6 +445,63 @@ function J = costo_optimizacion(x, Ts, N, delta, planta, esc)
     catch
         J = 1e10;
     end
+end
+
+
+function [best_x, best_J] = pso_simple(obj, nvars, lb, ub, opts)
+% Implementacion simple de Particle Swarm Optimization (Eberhart-Kennedy 1995)
+% para problemas de optimizacion sin restricciones de igualdad.
+%
+% Argumentos:
+%   obj   - handle de funcion objetivo a minimizar
+%   nvars - numero de variables
+%   lb    - cotas inferiores [1 x nvars]
+%   ub    - cotas superiores [1 x nvars]
+%   opts  - struct con N_particles, N_iters, w (inercia), c1 (cognitivo), c2 (social)
+
+    N      = opts.N_particles;
+    iters  = opts.N_iters;
+    w      = opts.w;
+    c1     = opts.c1;
+    c2     = opts.c2;
+
+    lb = lb(:)'; ub = ub(:)';
+    pos = lb + (ub - lb) .* rand(N, nvars);     % posiciones iniciales
+    vel = zeros(N, nvars);                       % velocidades iniciales
+
+    fit = zeros(N,1);
+    for i = 1:N
+        fit(i) = obj(pos(i,:));
+    end
+
+    pbest_pos = pos;
+    pbest_fit = fit;
+    [gbest_fit, idx] = min(pbest_fit);
+    gbest_pos = pbest_pos(idx,:);
+
+    for it = 1:iters
+        r1 = rand(N,nvars);
+        r2 = rand(N,nvars);
+        vel = w*vel + c1*r1.*(pbest_pos - pos) + c2*r2.*(repmat(gbest_pos,N,1) - pos);
+        pos = pos + vel;
+        pos = max(min(pos, ub), lb);   % saturar a cotas
+
+        for i = 1:N
+            fit(i) = obj(pos(i,:));
+            if fit(i) < pbest_fit(i)
+                pbest_pos(i,:) = pos(i,:);
+                pbest_fit(i) = fit(i);
+                if fit(i) < gbest_fit
+                    gbest_fit = fit(i);
+                    gbest_pos = pos(i,:);
+                end
+            end
+        end
+        fprintf('  PSO iter %d/%d - mejor costo: %.4f\n', it, iters, gbest_fit);
+    end
+
+    best_x = gbest_pos;
+    best_J = gbest_fit;
 end
 
 
