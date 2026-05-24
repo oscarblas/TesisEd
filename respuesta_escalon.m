@@ -1,7 +1,13 @@
 %%% respuesta_escalon.m
-%%% Respuesta escalon desde cero - Comparacion lineal vs no lineal con FIT%
-%%% Sistema de 4 tanques acoplados
-%%% Todo en MATLAB puro (sin Simulink)
+%%% Validacion del modelo linealizado vs no lineal del sistema de 4 tanques.
+%%%
+%%% Se realizan DOS pruebas complementarias:
+%%%   PRUEBA A: Llenado completo desde h=0 con entrada estacionaria.
+%%%             Muestra la coherencia global entre modelos. FIT esperado ~80-90%.
+%%%
+%%%   PRUEBA B: Pequena perturbacion (5%) desde el punto de operacion.
+%%%             Muestra la fidelidad del modelo lineal en la region donde
+%%%             operara el controlador GPC. FIT esperado >95%.
 
 clear; clc; close all;
 
@@ -10,7 +16,7 @@ Ts = 1;
 t_f = 2000;
 t = (0:Ts:t_f-1)';
 
-%% Parametros fisicos de la planta piloto
+%% Parametros fisicos
 A1 = 706.85; A2 = 706.85; A3 = 706.85; A4 = 706.85;
 a1 = 1.89;   a2 = 1.89;   a3 = 5.39;   a4 = 5.39;
 k1 = 1;      k2 = 1;
@@ -37,7 +43,7 @@ fprintf('=== Punto de operacion ===\n');
 fprintf('h0 = [%.4f, %.4f, %.4f, %.4f] cm\n', h0);
 fprintf('u0 = [%.4f, %.4f]\n\n', u10, u20);
 
-%% Matrices del modelo linealizado
+%% Modelo linealizado
 T1 = A1/a1 * sqrt(2*h10/g);
 T2 = A2/a2 * sqrt(2*h20/g);
 T3 = A3/a3 * sqrt(2*h30/g);
@@ -55,88 +61,167 @@ B_mat = [0            (1-y2)*k2/A1;
 
 C_mat = eye(4);
 D_mat = zeros(4,2);
+sys_lin = ss(A_mat, B_mat, C_mat, D_mat);
 
-%% Condiciones iniciales y entrada escalon
-% Tanques vacios al inicio
-h_initial = [0; 0; 0; 0];
-
-% Entrada: escalon de 0 a los valores estacionarios u10, u20
-u1_vec = u10 * ones(length(t), 1);
-u2_vec = u20 * ones(length(t), 1);
-
-%% Simulacion del modelo NO LINEAL (ode45)
 params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
-               'a1',a1,'a2',a2,'a3',a3,'a4',a4, ...
-               'k1',k1,'k2',k2,'y1',y1,'y2',y2,'g',g);
+                'a1',a1,'a2',a2,'a3',a3,'a4',a4, ...
+                'k1',k1,'k2',k2,'y1',y1,'y2',y2,'g',g);
 
-[~, h_nolin] = ode45(@(t_ode, h) modelo_nolineal(t_ode, h, t, u1_vec, u2_vec, params), t, h_initial);
+%% =====================================================================
+%  PRUEBA A: Llenado completo desde h = 0
+%  ---------------------------------------------------------------------
+%  Inicio: tanques vacios.
+%  Entrada: escalon a los valores estacionarios u10, u20.
+%  Esperado: ambos modelos convergen a h0, pero la linealizacion es
+%            menos precisa lejos del punto de operacion.
+% =====================================================================
+fprintf('=== PRUEBA A: Llenado desde h = 0 ===\n');
 
-%% Simulacion del modelo LINEAL (lsim)
-% En el modelo lineal: delta_h = h - h0, delta_u = u - u0
-% Condicion inicial en desviacion: delta_h(0) = h_initial - h0 = -h0
-% Entrada en desviacion: delta_u = u0 - u0 = 0 (entrada constante en el estacionario)
-sys_lin  = ss(A_mat, B_mat, C_mat, D_mat);
-delta_h0 = h_initial - h0;                  % condicion inicial en desviacion = -h0
-delta_u  = zeros(length(t), 2);             % delta_u = 0 (u = u0)
-delta_h  = lsim(sys_lin, delta_u, t, delta_h0);
-h_lin    = delta_h + h0';                   % h = h0 + delta_h
+h_init_A = [0; 0; 0; 0];
+u1_A = u10 * ones(length(t),1);
+u2_A = u20 * ones(length(t),1);
 
-%% Graficas de respuesta
-figure('Name','Respuesta Escalon','NumberTitle','off')
-titulos = {'Tanque 1 (superior)', 'Tanque 2 (superior)', ...
-           'Tanque 3 (inferior)', 'Tanque 4 (inferior)'};
+% No lineal
+[~, h_nolin_A] = ode45(@(t_ode,h) modelo_nolineal(t_ode,h,t,u1_A,u2_A,params), t, h_init_A);
 
+% Lineal (con condicion inicial en desviacion)
+delta_h0_A = h_init_A - h0;
+delta_u_A  = zeros(length(t), 2);
+delta_h_A  = lsim(sys_lin, delta_u_A, t, delta_h0_A);
+h_lin_A    = delta_h_A + h0';
+
+% FIT por tanque
+FIT_A = zeros(4,1);
+for i = 1:4
+    FIT_A(i) = 100*(1 - norm(h_nolin_A(:,i) - h_lin_A(:,i)) / ...
+                       norm(h_nolin_A(:,i) - mean(h_nolin_A(:,i))));
+    fprintf('  FIT h%d = %.2f%%\n', i, FIT_A(i));
+end
+fprintf('  FIT promedio: %.2f%%\n\n', mean(FIT_A));
+
+%% =====================================================================
+%  PRUEBA B: Pequena perturbacion (5%) desde el punto de operacion
+%  ---------------------------------------------------------------------
+%  Inicio: tanques en el punto de operacion h0.
+%  Entrada: escalon +5% en u1 (t=100s) y +5% en u2 (t=500s).
+%  Esperado: ambos modelos casi identicos. FIT > 95%.
+%  Esta es la prueba RELEVANTE para validar el modelo de prediccion
+%  del controlador GPC.
+% =====================================================================
+fprintf('=== PRUEBA B: Perturbacion 5%% desde h = h0 ===\n');
+
+pct = 0.05;
+h_init_B = h0;
+
+u1_B = u10 * ones(length(t),1);
+u2_B = u20 * ones(length(t),1);
+u1_B(101:end) = u10 * (1 + pct);
+u2_B(501:end) = u20 * (1 + pct);
+
+% No lineal
+[~, h_nolin_B] = ode45(@(t_ode,h) modelo_nolineal(t_ode,h,t,u1_B,u2_B,params), t, h_init_B);
+
+% Lineal (sistema arranca en el punto de operacion -> delta_h0 = 0)
+delta_h0_B = h_init_B - h0;             % = [0;0;0;0]
+delta_u_B  = [u1_B - u10, u2_B - u20];
+delta_h_B  = lsim(sys_lin, delta_u_B, t, delta_h0_B);
+h_lin_B    = delta_h_B + h0';
+
+% FIT por tanque
+FIT_B = zeros(4,1);
+for i = 1:4
+    FIT_B(i) = 100*(1 - norm(h_nolin_B(:,i) - h_lin_B(:,i)) / ...
+                       norm(h_nolin_B(:,i) - mean(h_nolin_B(:,i))));
+    fprintf('  FIT h%d = %.2f%%\n', i, FIT_B(i));
+end
+fprintf('  FIT promedio: %.2f%%\n\n', mean(FIT_B));
+
+%% =====================================================================
+%  TABLA RESUMEN
+% =====================================================================
+fprintf('=========================================================\n');
+fprintf('  RESUMEN COMPARATIVO DE FIT%%\n');
+fprintf('=========================================================\n');
+fprintf('  Tanque  |  Prueba A (llenado)  |  Prueba B (perturb)  \n');
+fprintf('---------------------------------------------------------\n');
+for i = 1:4
+    fprintf('   h%d    |       %6.2f%%        |       %6.2f%%        \n', ...
+            i, FIT_A(i), FIT_B(i));
+end
+fprintf('---------------------------------------------------------\n');
+fprintf('  PROMEDIO|       %6.2f%%        |       %6.2f%%        \n', ...
+        mean(FIT_A), mean(FIT_B));
+fprintf('=========================================================\n\n');
+
+%% =====================================================================
+%  GRAFICAS
+% =====================================================================
+
+% --- Figura 1: Prueba A (llenado) ---
+figure('Name','Prueba A: Llenado desde h=0','NumberTitle','off')
+titulos = {'Tanque 1 (superior)','Tanque 2 (superior)', ...
+           'Tanque 3 (inferior, controlado)','Tanque 4 (inferior, controlado)'};
 for i = 1:4
     subplot(2,2,i)
-    plot(t, h_nolin(:,i), 'b', 'LineWidth', 1.5); hold on;
-    plot(t, h_lin(:,i), 'r--', 'LineWidth', 1.5);
+    plot(t, h_nolin_A(:,i), 'b', 'LineWidth', 1.5); hold on;
+    plot(t, h_lin_A(:,i), 'r--', 'LineWidth', 1.5);
     yline(h0(i), 'k:', 'h_0', 'LineWidth', 1);
-    ylabel(['h_' num2str(i) ' (cm)']);
-    xlabel('Tiempo (s)');
-    legend('No lineal', 'Lineal', 'Estacionario', 'Location', 'best');
-    title(titulos{i});
+    ylabel(['h_' num2str(i) ' (cm)']); xlabel('Tiempo (s)');
+    legend('No lineal','Lineal','Estacionario','Location','best');
+    title(sprintf('%s (FIT = %.2f%%)', titulos{i}, FIT_A(i)));
     grid on;
 end
-sgtitle('Respuesta escalon desde h=0 hacia el punto de operacion');
+sgtitle('Prueba A: Llenado completo desde h = 0 con u = u_0 (validacion global)');
 
-%% Graficas de entradas
-figure('Name','Entradas','NumberTitle','off')
-subplot(2,1,1)
-stairs(t, u1_vec, 'b', 'LineWidth', 1.5);
-ylabel('u_1'); xlabel('Tiempo (s)');
-title(['Entrada u_1 = ' num2str(u10, '%.2f') ' (estacionario)']);
-grid on;
-
-subplot(2,1,2)
-stairs(t, u2_vec, 'r', 'LineWidth', 1.5);
-ylabel('u_2'); xlabel('Tiempo (s)');
-title(['Entrada u_2 = ' num2str(u20, '%.2f') ' (estacionario)']);
-grid on;
-sgtitle('Senales de entrada (escalon de 0 a valores estacionarios)');
-
-%% Calculo de FIT%
-fprintf('=== FIT%% ===\n');
+% --- Figura 2: Prueba B (perturbacion) ---
+figure('Name','Prueba B: Perturbacion 5% desde h=h0','NumberTitle','off')
 for i = 1:4
-    FIT = 100 * (1 - norm(h_nolin(:,i) - h_lin(:,i)) / ...
-                     norm(h_nolin(:,i) - mean(h_nolin(:,i))));
-    fprintf('FIT h%d = %.2f%%\n', i, FIT);
+    subplot(2,2,i)
+    plot(t, h_nolin_B(:,i), 'b', 'LineWidth', 1.5); hold on;
+    plot(t, h_lin_B(:,i), 'r--', 'LineWidth', 1.5);
+    yline(h0(i), 'k:', 'h_0', 'LineWidth', 1);
+    ylabel(['h_' num2str(i) ' (cm)']); xlabel('Tiempo (s)');
+    legend('No lineal','Lineal','Estacionario','Location','best');
+    title(sprintf('%s (FIT = %.2f%%)', titulos{i}, FIT_B(i)));
+    grid on;
 end
+sgtitle('Prueba B: Perturbacion 5% desde h = h_0 (validacion en region de operacion del GPC)');
 
-%% ====================================================================
+% --- Figura 3: Senales de entrada de ambas pruebas ---
+figure('Name','Entradas aplicadas','NumberTitle','off')
+subplot(2,2,1)
+stairs(t, u1_A, 'b', 'LineWidth', 1.5);
+ylabel('u_1'); xlabel('Tiempo (s)');
+title(sprintf('Prueba A: u_1 = u_{10} = %.2f', u10)); grid on;
+
+subplot(2,2,2)
+stairs(t, u2_A, 'r', 'LineWidth', 1.5);
+ylabel('u_2'); xlabel('Tiempo (s)');
+title(sprintf('Prueba A: u_2 = u_{20} = %.2f', u20)); grid on;
+
+subplot(2,2,3)
+stairs(t, u1_B, 'b', 'LineWidth', 1.5);
+ylabel('u_1'); xlabel('Tiempo (s)');
+title(sprintf('Prueba B: u_1 (escalon +%.0f%% en t=100s)', pct*100)); grid on;
+
+subplot(2,2,4)
+stairs(t, u2_B, 'r', 'LineWidth', 1.5);
+ylabel('u_2'); xlabel('Tiempo (s)');
+title(sprintf('Prueba B: u_2 (escalon +%.0f%% en t=500s)', pct*100)); grid on;
+sgtitle('Senales de entrada aplicadas en cada prueba');
+
+%% =====================================================================
 %  Funcion del modelo no lineal
-%  ====================================================================
+%  =====================================================================
 function dhdt = modelo_nolineal(t_ode, h, t_vec, u1_vec, u2_vec, p)
-    % Interpolacion de entradas (zero-order hold)
     u1 = interp1(t_vec, u1_vec, t_ode, 'previous', u1_vec(end));
     u2 = interp1(t_vec, u2_vec, t_ode, 'previous', u2_vec(end));
 
-    % Evitar alturas negativas
     h1 = max(h(1), 0);
     h2 = max(h(2), 0);
     h3 = max(h(3), 0);
     h4 = max(h(4), 0);
 
-    % Ecuaciones diferenciales no lineales
     dh1dt = -p.a1/p.A1*sqrt(2*p.g*h1) + (1-p.y2)*p.k2*u2/p.A1;
     dh2dt = -p.a2/p.A2*sqrt(2*p.g*h2) + (1-p.y1)*p.k1*u1/p.A2;
     dh3dt = -p.a3/p.A3*sqrt(2*p.g*h3) + p.a2/p.A3*sqrt(2*p.g*h2) + p.y2*p.k2*u2/p.A3;
