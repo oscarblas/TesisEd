@@ -273,7 +273,10 @@ for k = 1:N_steps-1
     % ---- (f) Resolucion del QP ------------------------------------------
     [DU, ~, exitflag] = quadprog(H_qp, f_qp, A_ineq_static, b_ineq, ...
                                  [], [], [], [], [], opts_qp);
-    if exitflag ~= 1
+    % En problemas convexos, exitflag = 1 (optimo) y exitflag = 2
+    % (minimo local con paso pequeno) son ambos validos. Solo se
+    % descarta la solucion si exitflag es 0 o negativo.
+    if exitflag <= 0 || isempty(DU)
         warning('QP no convergio en k=%d (exitflag=%d)', k, exitflag);
         DU = zeros(nu*Nu, 1);
     end

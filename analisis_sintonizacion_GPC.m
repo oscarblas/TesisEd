@@ -398,7 +398,7 @@ function [hist, m] = simular_GPC(p, planta, esc)
                   -u_min_vec + u_prev_stack];
 
         [DU,~,ef] = quadprog(H_qp, f_qp, A_ineq, b_ineq, [],[],[],[],[],opts);
-        if ef~=1, DU = zeros(nu*Nu,1); end
+        if ef<=0 || isempty(DU), DU = zeros(nu*Nu,1); end
 
         % Primer incremento de cada canal
         Du_aplicado = [DU(1); DU(Nu+1)];
