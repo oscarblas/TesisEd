@@ -162,9 +162,9 @@ Esta forma polinomial es la que permite identificar directamente los polinomios 
 
 ### 3.3.2 Selección del horizonte del modelo y del tiempo de muestreo
 
-Antes de proceder a la construcción de la matriz dinámica **G** y al cálculo de los coeficientes de respuesta al escalón, resulta imprescindible fijar dos parámetros del modelo del controlador: el **tiempo de muestreo** `T_s` y el **horizonte del modelo** `N`. Estos parámetros, a diferencia de los pesos `λ` y los horizontes `N_u`, **no son objeto del proceso de sintonización** abordado en la sección 3.4: se derivan directamente del análisis de la dinámica de la planta y permanecen fijos durante todo el diseño del controlador. Esta separación es estándar en la literatura del control predictivo basado en modelo y se observa tanto en el método clásico de Shridhar y Cooper [pendiente encontrar fuente — Shridhar & Cooper 1997] como en las implementaciones reportadas para la misma planta piloto [10] [pendiente encontrar fuente — Oré Sánchez].
+Antes de proceder a la construcción de la matriz dinámica **G** y al cálculo de los coeficientes de respuesta al escalón, resulta imprescindible fijar dos parámetros del modelo del controlador: el **tiempo de muestreo** `T_s` y el **horizonte del modelo** `N`. Estos parámetros, a diferencia de los pesos `λ` y el horizonte de control `N_u`, **no son objeto del proceso de sintonización** abordado en la sección 3.4: se derivan directamente del análisis dinámico de la planta y permanecen fijos durante todo el diseño del controlador. Esta separación es estándar en la literatura del control digital basado en modelo, ya que `T_s` y `N` se relacionan con propiedades intrínsecas del proceso —las constantes de tiempo de sus subprocesos— y no con el desempeño deseado del lazo cerrado, el cual sí depende de `N_u`, `δ` y `λ`.
 
-**Selección del tiempo de muestreo.** El criterio empleado es el propuesto por Shridhar y Cooper, según el cual el tiempo de muestreo debe ser una fracción de la constante de tiempo más rápida de los subprocesos del sistema, garantizando así que la dinámica más veloz quede capturada con resolución suficiente:
+**Selección del tiempo de muestreo.** El criterio empleado es la regla práctica del muestreo de sistemas controlados [pendiente encontrar fuente — Ogata, Discrete-Time Control Systems], según la cual el período debe ser una fracción de la constante de tiempo más rápida del sistema, garantizando así que la dinámica más veloz quede capturada con resolución suficiente y se respete el teorema de Nyquist-Shannon aplicado al control:
 
 **Preview:**
 
@@ -178,7 +178,7 @@ T_s = \min\left( 0.1 \cdot \tau_{ij} \right)
 
 donde `τ_{ij}` es la constante de tiempo dominante de cada subproceso `(i, j)` obtenida de la matriz de funciones de transferencia. Para el sistema de cuatro tanques acoplados, las constantes de tiempo `τ_{ij}` calculadas a partir del modelo linealizado se encuentran en el rango de los segundos, lo cual conduce a un valor `T_s = 2 s` adoptado en esta tesis.
 
-**Selección del horizonte del modelo.** El horizonte del modelo `N` define cuántos coeficientes de respuesta al escalón conforman cada bloque de la matriz dinámica **G**. Su valor debe ser lo suficientemente grande para que las respuestas al escalón de todos los subprocesos hayan alcanzado prácticamente su valor asintótico, condición necesaria para que el modelo de predicción no trunque información dinámica relevante. La regla de Shridhar y Cooper establece:
+**Selección del horizonte del modelo.** El horizonte del modelo `N` define cuántos coeficientes de respuesta al escalón conforman cada bloque de la matriz dinámica **G**. Su valor debe ser lo suficientemente grande para que las respuestas al escalón de todos los subprocesos hayan alcanzado prácticamente su valor asintótico, condición necesaria para que el modelo de predicción no trunque información dinámica relevante. La regla práctica adoptada, también de uso común en la literatura del control predictivo [pendiente encontrar fuente — Camacho & Bordons], establece:
 
 **Preview:**
 
@@ -510,7 +510,7 @@ Aplicando estas reglas se obtienen los valores iniciales mostrados en la Tabla 3
 
 ### 3.4.3 Método de Shridhar-Cooper extendido a MIMO
 
-El método propuesto por Shridhar y Cooper [pendiente encontrar fuente — Shridhar & Cooper 1997] es un enfoque analítico basado en la aproximación del proceso por un modelo de primer orden más tiempo muerto (FOPDT). El método fue concebido originalmente para el caso monovariable y extendido al ámbito multivariable [10]. Las mismas reglas de Shridhar-Cooper se utilizaron en la sección 3.3.2 para fijar `T_s` y `N`; en esta sección se aplican las reglas restantes del método para determinar `N_u` y `λ`.
+El método propuesto por Shridhar y Cooper [pendiente encontrar fuente — Shridhar & Cooper 1997] es un enfoque analítico basado en la aproximación del proceso por un modelo de primer orden más tiempo muerto (FOPDT). El método fue concebido originalmente para el caso monovariable y extendido al ámbito multivariable [10]. Su aporte propio y distintivo es la obtención de **fórmulas cerradas para el horizonte de control `N_u` y el peso del esfuerzo de control `λ`** a partir de las características FOPDT del proceso. Las reglas para `T_s` y `N` aplicadas en la sección 3.3.2 son de uso general en muestreo de sistemas controlados y no constituyen el aporte original de los autores, por lo que aquí solo se exponen las fórmulas específicas del método.
 
 **Paso 1.** Aproximación de cada subproceso `(r, s)` por un modelo FOPDT:
 
