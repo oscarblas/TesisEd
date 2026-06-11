@@ -1,11 +1,15 @@
 %% ========================================================================
 %  comparacion_GPC_vs_PID.m
-%  Comparacion lado a lado: GPC multivariable vs PID descentralizado
-%  Sistema de 4 tanques acoplados
+%  Comparacion 1 a 1 entre el controlador GPC (Cap. 3) y el PI
+%  descentralizado (Cap. 4.2) en el escenario de referencias cruzadas.
 %
-%  REQUISITOS DE EJECUCION:
-%   1. Ejecutar primero  controlador_PID.m   (genera resultados_PID.mat)
-%   2. Ejecutar despues  este script         (corre el GPC y compara)
+%  REQUISITOS PREVIOS:
+%    1. Ejecutar primero  controlador_PID.m   -> genera resultados_PID.mat
+%    2. Ejecutar despues  este script          -> corre el GPC y compara
+%
+%  Para una comparacion completa sobre los 6 escenarios del Cap. 4,
+%  usar el script  simulaciones_cap4.m  en su lugar. Este archivo sirve
+%  como referencia rapida del caso de referencias cruzadas.
 % ========================================================================
 
 clear; clc; close all;
@@ -18,7 +22,7 @@ PID = load('resultados_PID.mat');
 fprintf('Resultados PID cargados.\n');
 
 %% ========================================================================
-%  Ejecutar GPC con misma configuracion (parametros optimos)
+%  Parametros de la planta (mismos del Cap. 2)
 % ========================================================================
 A1=706.85; A2=706.85; A3=706.85; A4=706.85;
 a1=1.89;   a2=1.89;   a3=5.39;   a4=5.39;
@@ -35,23 +39,28 @@ h0  = [h10; h20; h30; h40];
 T1=A1/a1*sqrt(2*h10/g); T2=A2/a2*sqrt(2*h20/g);
 T3=A3/a3*sqrt(2*h30/g); T4=A4/a4*sqrt(2*h40/g);
 
+% Modelo lineal continuo (para el GPC)
 Ac = [-1/T1 0 0 0; 0 -1/T2 0 0;
        0 A2/(A3*T2) -1/T3 0; A1/(A4*T1) 0 0 -1/T4];
 Bc = [0 (1-y2)*k2/A1; (1-y1)*k1/A2 0;
       0 y2*k2/A3; y1*k1/A4 0];
-Cc = [0 0 1 0; 0 0 0 1]; Dc = zeros(2,2);
+Cc = [0 0 1 0; 0 0 0 1];
+Dc = zeros(2,2);
 
-% Parametros optimos del GPC
+%% ========================================================================
+%  Parametros del GPC (sintonizacion ganadora del analisis comparativo)
+% ========================================================================
 Ts = 2; N = 50; Nu = 9;
 delta  = [10 10];
 lambda = [0.0076803 0.0076803];
 
-% Discretizacion
+%% ========================================================================
+%  Discretizacion y construccion de la matriz dinamica G (formulacion GPC)
+% ========================================================================
 sys_d = c2d(ss(Ac,Bc,Cc,Dc), Ts, 'zoh');
 [Ad, Bd, Cd, ~] = ssdata(sys_d);
 nu = size(Bd,2); ny = size(Cd,1);
 
-% Coeficientes de respuesta al escalon y matriz dinamica G (formulacion GPC)
 G_z = tf(sys_d);
 t_step = (0:N)*Ts;
 g_step = cell(ny, nu);
@@ -91,11 +100,12 @@ Du_min_vec = [repmat(Du_min(1),Nu,1); repmat(Du_min(2),Nu,1)];
 u_max_vec  = [repmat(u_max(1),Nu,1);  repmat(u_max(2),Nu,1)];
 u_min_vec  = [repmat(u_min(1),Nu,1);  repmat(u_min(2),Nu,1)];
 
-Tri_one = tril(ones(Nu));
-T_mat = blkdiag(Tri_one, Tri_one);
+T_mat = blkdiag(tril(ones(Nu)), tril(ones(Nu)));
 A_ineq = [eye(nu*Nu); -eye(nu*Nu); T_mat; -T_mat];
 
-% Mismo escenario que el PID
+%% ========================================================================
+%  Escenario de prueba: referencias cruzadas (mismo del PID)
+% ========================================================================
 t_sim = 1500; N_steps = round(t_sim/Ts);
 t_vec = (0:N_steps-1)*Ts;
 ref = zeros(2,N_steps);
@@ -112,11 +122,11 @@ params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
 opts = optimoptions('quadprog','Display','off');
 
 fprintf('Ejecutando GPC...\n');
-for k=1:N_steps-1
+for k = 1:N_steps-1
     x_des = h_real - h0;
     u_prev_des = u_prev - u0;
 
-    % Respuesta libre F (en desviacion)
+    % Respuesta libre F (modelo con Du=0)
     F_vec = zeros(ny*N, 1);
     x_temp = x_des;
     for j = 1:N
@@ -126,7 +136,7 @@ for k=1:N_steps-1
         F_vec(N + j) = y_pred(2);
     end
 
-    % Referencia futura constante (setpoint actual)
+    % Referencia futura constante
     r_des = ref(:,k) - [h30;h40];
     W = [repmat(r_des(1),N,1); repmat(r_des(2),N,1)];
 
@@ -135,7 +145,7 @@ for k=1:N_steps-1
     u_prev_stack = [repmat(u_prev(1),Nu,1); repmat(u_prev(2),Nu,1)];
     b_ineq = [Du_max_vec; -Du_min_vec;
               u_max_vec - u_prev_stack;
-              -u_min_vec + u_prev_stack];
+             -u_min_vec + u_prev_stack];
 
     [DU,~,ef] = quadprog(H_qp, f_qp, A_ineq, b_ineq, [],[],[],[],[],opts);
     if ef<=0 || isempty(DU), DU = zeros(nu*Nu,1); end
@@ -155,7 +165,9 @@ end
 U_log_GPC(:,end) = u_prev;
 fprintf('GPC OK\n\n');
 
-%% Calcular metricas del GPC
+%% ========================================================================
+%  Calcular metricas del GPC
+% ========================================================================
 e_h3 = ref(1,:) - H_log_GPC(3,:);
 e_h4 = ref(2,:) - H_log_GPC(4,:);
 
@@ -175,39 +187,34 @@ GPC.overshoot = max(ov3,ov4);
 GPC.esfuerzo = sum(sum(abs(diff(U_log_GPC,1,2))));
 
 %% ========================================================================
-%  TABLA COMPARATIVA
+%  Tabla comparativa
 % ========================================================================
 fprintf('=========================================================\n');
-fprintf('       COMPARACION GPC vs PID DESCENTRALIZADO\n');
+fprintf('       COMPARACION GPC vs PI DESCENTRALIZADO\n');
+fprintf('       (Escenario: referencias cruzadas)\n');
 fprintf('=========================================================\n');
-fprintf('Metrica         PID            GPC          Ganador\n');
+fprintf('Metrica         PI             GPC          Ganador\n');
 fprintf('---------------------------------------------------------\n');
-fprintf('IAE         %10.2f   %10.2f      %s\n', PID.IAE, GPC.IAE, ...
-        ganador(PID.IAE, GPC.IAE));
-fprintf('ISE         %10.2f   %10.2f      %s\n', PID.ISE, GPC.ISE, ...
-        ganador(PID.ISE, GPC.ISE));
-fprintf('ITAE        %10.2f   %10.2f      %s\n', PID.ITAE, GPC.ITAE, ...
-        ganador(PID.ITAE, GPC.ITAE));
-fprintf('t_est (s)   %10.2f   %10.2f      %s\n', PID.t_est, GPC.t_est, ...
-        ganador(PID.t_est, GPC.t_est));
-fprintf('Overshoot%% %10.2f   %10.2f      %s\n', PID.overshoot, GPC.overshoot, ...
-        ganador(PID.overshoot, GPC.overshoot));
-fprintf('Esfuerzo    %10.2f   %10.2f      %s\n', PID.esfuerzo, GPC.esfuerzo, ...
-        ganador(PID.esfuerzo, GPC.esfuerzo));
+fprintf('IAE         %10.2f   %10.2f      %s\n', PID.IAE, GPC.IAE, ganador(PID.IAE, GPC.IAE));
+fprintf('ISE         %10.2f   %10.2f      %s\n', PID.ISE, GPC.ISE, ganador(PID.ISE, GPC.ISE));
+fprintf('ITAE        %10.2f   %10.2f      %s\n', PID.ITAE, GPC.ITAE, ganador(PID.ITAE, GPC.ITAE));
+fprintf('t_est (s)   %10.2f   %10.2f      %s\n', PID.t_est, GPC.t_est, ganador(PID.t_est, GPC.t_est));
+fprintf('Overshoot%% %10.2f   %10.2f      %s\n', PID.overshoot, GPC.overshoot, ganador(PID.overshoot, GPC.overshoot));
+fprintf('Esfuerzo    %10.2f   %10.2f      %s\n', PID.esfuerzo, GPC.esfuerzo, ganador(PID.esfuerzo, GPC.esfuerzo));
 fprintf('=========================================================\n\n');
 
 %% ========================================================================
-%  GRAFICAS COMPARATIVAS
+%  Graficas comparativas
 % ========================================================================
 
-% Salidas controladas
-figure('Name','Comparacion GPC vs PID - Salidas','NumberTitle','off')
+% Salidas
+figure('Name','Comparacion GPC vs PI - Salidas','NumberTitle','off')
 subplot(2,1,1)
 plot(t_vec, H_log_GPC(3,:), 'b', 'LineWidth', 1.6); hold on;
 plot(PID.t_vec, PID.H_log(3,:), 'g', 'LineWidth', 1.6);
 stairs(t_vec, ref(1,:), 'k--', 'LineWidth', 1.2);
 ylabel('h_3 (cm)'); xlabel('Tiempo (s)');
-legend('GPC','PID','Referencia','Location','best');
+legend('GPC','PI','Referencia','Location','best');
 title('Tanque 3 - Respuesta'); grid on;
 
 subplot(2,1,2)
@@ -215,43 +222,43 @@ plot(t_vec, H_log_GPC(4,:), 'b', 'LineWidth', 1.6); hold on;
 plot(PID.t_vec, PID.H_log(4,:), 'g', 'LineWidth', 1.6);
 stairs(t_vec, ref(2,:), 'k--', 'LineWidth', 1.2);
 ylabel('h_4 (cm)'); xlabel('Tiempo (s)');
-legend('GPC','PID','Referencia','Location','best');
+legend('GPC','PI','Referencia','Location','best');
 title('Tanque 4 - Respuesta'); grid on;
-sgtitle('Comparacion GPC vs PID descentralizado');
+sgtitle('Comparacion GPC vs PI descentralizado');
 
 % Senales de control
-figure('Name','Comparacion GPC vs PID - Control','NumberTitle','off')
+figure('Name','Comparacion GPC vs PI - Control','NumberTitle','off')
 subplot(2,1,1)
 stairs(t_vec, U_log_GPC(1,:), 'b', 'LineWidth', 1.4); hold on;
 stairs(PID.t_vec, PID.U_log(1,:), 'g', 'LineWidth', 1.4);
 ylabel('u_1'); xlabel('Tiempo (s)');
-legend('GPC','PID','Location','best'); grid on;
+legend('GPC','PI','Location','best'); grid on;
 title('Senal de control u_1');
 
 subplot(2,1,2)
 stairs(t_vec, U_log_GPC(2,:), 'b', 'LineWidth', 1.4); hold on;
 stairs(PID.t_vec, PID.U_log(2,:), 'g', 'LineWidth', 1.4);
 ylabel('u_2'); xlabel('Tiempo (s)');
-legend('GPC','PID','Location','best'); grid on;
+legend('GPC','PI','Location','best'); grid on;
 title('Senal de control u_2');
 
-% Error en cada canal
+% Errores
 figure('Name','Errores comparados','NumberTitle','off')
 subplot(2,1,1)
 plot(t_vec, ref(1,:) - H_log_GPC(3,:), 'b', 'LineWidth', 1.4); hold on;
 plot(PID.t_vec, PID.ref(1,:) - PID.H_log(3,:), 'g', 'LineWidth', 1.4);
 ylabel('e_{h_3} (cm)'); xlabel('Tiempo (s)');
-legend('GPC','PID','Location','best'); grid on;
-title('Error de seguimiento en h_3');
+legend('GPC','PI','Location','best'); grid on;
 yline(0,'k:');
+title('Error de seguimiento en h_3');
 
 subplot(2,1,2)
 plot(t_vec, ref(2,:) - H_log_GPC(4,:), 'b', 'LineWidth', 1.4); hold on;
 plot(PID.t_vec, PID.ref(2,:) - PID.H_log(4,:), 'g', 'LineWidth', 1.4);
 ylabel('e_{h_4} (cm)'); xlabel('Tiempo (s)');
-legend('GPC','PID','Location','best'); grid on;
-title('Error de seguimiento en h_4');
+legend('GPC','PI','Location','best'); grid on;
 yline(0,'k:');
+title('Error de seguimiento en h_4');
 
 % Barras de metricas
 figure('Name','Resumen de metricas','NumberTitle','off')
@@ -260,17 +267,16 @@ val_PID = [PID.IAE, PID.ISE, PID.ITAE/1000, PID.t_est, PID.overshoot, PID.esfuer
 val_GPC = [GPC.IAE, GPC.ISE, GPC.ITAE/1000, GPC.t_est, GPC.overshoot, GPC.esfuerzo];
 bar([val_PID; val_GPC]');
 set(gca,'XTickLabel',metricas);
-legend('PID','GPC','Location','best');
+legend('PI','GPC','Location','best');
 ylabel('Valor (menor = mejor)'); grid on;
-title('Comparacion de metricas (escalado)');
+title('Comparacion de metricas (escenario referencias cruzadas)');
 
 %% ====================== Funciones auxiliares ============================
-
 function s = ganador(pid_v, gpc_v)
     if abs(pid_v - gpc_v) < 1e-6
         s = 'EMPATE';
     elseif pid_v < gpc_v
-        s = 'PID';
+        s = 'PI';
     else
         s = 'GPC';
     end
