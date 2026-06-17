@@ -1,4 +1,4 @@
-# CAPÍTULO 4 — Comparación del Controlador Predictivo GPC frente al Control PID Convencional bajo Escenarios con Referencias Cruzadas
+# CAPÍTULO 4 — Análisis Comparativo del Controlador GPC frente al PID Convencional en el Sistema de Cuatro Tanques Acoplados
 
 > **Instrucciones de uso:**
 > - Para cada fórmula tienes el **preview renderizado** (lo que se debe ver) y el **código LaTeX** para Word.
@@ -14,41 +14,37 @@
 
 ## 4.1 Introducción
 
-El control proporcional-integral-derivativo (PID) constituye, hasta la fecha, la estrategia de control más empleada en la industria moderna, abarcando entre el 90% y el 95% de los lazos de control implementados en procesos de manufactura, química, hidráulica, neumática y energía [16]. Su éxito radica en la simplicidad de su formulación, la disponibilidad de hardware industrial que lo soporta de forma nativa y la familiaridad que el personal técnico tiene con su sintonización y operación. No obstante, la formulación clásica del PID está concebida para sistemas de una entrada y una salida (SISO), lo cual restringe su capacidad de manejar de forma natural procesos multivariables con acoplamiento cruzado, como es el caso del sistema hidráulico de cuatro tanques acoplados estudiado en esta tesis.
+El control proporcional-integral (PI) constituye, hasta la fecha, la estrategia de control más empleada en la industria moderna, abarcando entre el 90% y el 95% de los lazos de control implementados en procesos hidráulicos, químicos, energéticos y de manufactura [16]. Su éxito se sustenta en la simplicidad de su formulación, la disponibilidad nativa en cualquier autómata programable industrial y la familiaridad del personal técnico con su operación y sintonización. No obstante, la formulación clásica del PI está concebida para sistemas de una entrada y una salida (SISO), lo cual restringe su capacidad de manejar de forma natural procesos multivariables con acoplamiento cruzado. En sistemas industriales reales esta limitación suele abordarse mediante el uso de **desacopladores estáticos**, que cancelan el acople cruzado en estado estacionario y permiten que cada lazo SISO opere casi de forma independiente.
 
-Frente a esta limitación, el Control Predictivo Generalizado (GPC) diseñado en el Capítulo 3 se propone como una alternativa que considera de manera explícita la naturaleza multivariable del proceso, las restricciones físicas sobre los actuadores y la dinámica conjunta de todas las salidas. Para validar empíricamente la superioridad del GPC frente al PID, el presente capítulo desarrolla un análisis comparativo sistemático sobre seis escenarios de prueba que evidencian las propiedades distintivas de ambos controladores: desde un caso nominal de seguimiento independiente hasta condiciones operativas adversas que ponen a prueba la robustez del lazo cerrado.
+Frente a esta estrategia clásica, el Control Predictivo Generalizado (GPC) diseñado en el Capítulo 3 considera de manera explícita la naturaleza multivariable del proceso, las restricciones físicas sobre los actuadores y la dinámica conjunta de las salidas. Para validar empíricamente la superioridad del GPC frente al PI descentralizado con desacoplador, el presente capítulo desarrolla un análisis comparativo sistemático sobre un escenario operativo que evidencia los aspectos donde cada estrategia muestra sus fortalezas y limitaciones.
 
-La comparación se sustenta en una métrica combinada que incorpora los seis criterios de desempeño definidos en la sección 3.2 (IAE, ISE, ITAE, tiempo de establecimiento, sobrepico y esfuerzo de control), complementada con una **métrica específica de acoplamiento cruzado** introducida en este capítulo para cuantificar el grado de interacción entre los lazos de control. Esta última métrica resulta fundamental para responder de manera objetiva a la pregunta central del trabajo: ¿en qué medida y bajo qué condiciones es preferible un controlador predictivo frente a un esquema clásico de PID descentralizado?
+El escenario diseñado integra en una sola simulación los desafíos más representativos: (i) el arranque del sistema desde tanques vacíos hasta el punto estacionario, (ii) cambios de referencia simultáneos que activan el acoplamiento cruzado del sistema, (iii) la inyección de ruido gaussiano en las mediciones de los sensores y (iv) la operación en regiones alejadas del punto de linealización empleado en el diseño del controlador clásico. Esta integración permite comparar ambos controladores bajo condiciones que reproducen la operación industrial real y poner en evidencia el comportamiento dinámico, el rechazo de perturbaciones, la robustez ante ruido y la capacidad de operación extendida.
 
-El capítulo se estructura como sigue. La sección 4.2 describe el diseño y la sintonización del controlador PID descentralizado utilizado como referencia. La sección 4.3 detalla los seis escenarios comparativos diseñados para evaluar el desempeño de ambos controladores. La sección 4.4 presenta el análisis cuantitativo de los resultados. La sección 4.5 discute las observaciones obtenidas y valida las hipótesis del trabajo. La sección 4.6 desarrolla una propuesta de implementación industrial del controlador seleccionado. Finalmente, la sección 4.7 presenta las conclusiones del capítulo.
+El capítulo se estructura como sigue. La sección 4.2 describe el diseño y la sintonización del controlador PI descentralizado con desacoplador estático utilizado como referencia. La sección 4.3 detalla el escenario integrado de simulación. La sección 4.4 presenta el análisis cuantitativo de los resultados, incluyendo la métrica específica de acoplamiento cruzado introducida en este trabajo. La sección 4.5 discute los hallazgos y valida las hipótesis del trabajo. La sección 4.6 describe la implementación en Simulink de ambos controladores como complemento al análisis. Finalmente, la sección 4.7 expone las conclusiones del capítulo.
 
 ---
 
-## 4.2 Implementación del controlador PID descentralizado de referencia
+## 4.2 Implementación del controlador PI descentralizado con desacoplador estático
 
-Para que la comparación entre el GPC y el PID sea justa y representativa, el controlador PID empleado como referencia se diseña bajo las mejores prácticas reportadas en la literatura industrial, evitando una sintonización deliberadamente subóptima que sesgaría el análisis. En particular, se adopta una estrategia de **control descentralizado** (multilazo) con sintonización analítica por Internal Model Control (IMC), por ser la combinación más empleada en aplicaciones industriales de sistemas MIMO de baja dimensión [14] [16].
+Para que la comparación con el GPC sea justa y representativa, el controlador de referencia se diseña bajo las mejores prácticas reportadas en la literatura industrial. Se adopta una estrategia de **control descentralizado** (multilazo) con sintonización analítica por Internal Model Control (IMC) y se complementa con un **desacoplador estático** que cancela el acople cruzado en estado estacionario, configuración estándar en aplicaciones industriales de sistemas MIMO de baja dimensión [14] [16].
 
 ### 4.2.1 Estrategia de emparejamiento entrada-salida
 
-En el sistema de cuatro tanques acoplados, cada una de las dos bombas afecta tanto al tanque inferior directamente conectado a su rama como, de manera indirecta, al tanque inferior de la rama opuesta a través del acoplamiento cruzado de los tanques superiores. Para diseñar un PID descentralizado se requiere asociar cada entrada con una única salida —emparejamiento o *pairing*— buscando el camino dinámico **directo** y **más rápido** entre ambos.
+En el sistema de cuatro tanques acoplados, cada bomba afecta directamente al tanque inferior de su rama y, de manera indirecta, al tanque inferior opuesto a través del acoplamiento cruzado de los tanques superiores. Examinando la matriz `B_c` del modelo linealizado se identifican los caminos directos:
 
-Examinando la matriz `B_c` del modelo linealizado, se identifican los caminos directos:
-
-- `u₁ → h₄` con ganancia `γ₁·k₁/A₄` (camino directo, rápido).
-- `u₁ → h₂ → h₃` con ganancia `(1-γ₁)·k₁/A₂` (camino cruzado, lento).
-- `u₂ → h₃` con ganancia `γ₂·k₂/A₃` (camino directo, rápido).
-- `u₂ → h₁ → h₄` con ganancia `(1-γ₂)·k₂/A₁` (camino cruzado, lento).
+- `u₁ → h₄` con ganancia `γ₁·k₁/A₄` (camino directo, rápido)
+- `u₂ → h₃` con ganancia `γ₂·k₂/A₃` (camino directo, rápido)
 
 En consecuencia, el emparejamiento adoptado es:
 
-- **PID₁:** `u₁` controla `h₄`
-- **PID₂:** `u₂` controla `h₃`
+- **PI_1:** `u₁` controla `h₄`
+- **PI_2:** `u₂` controla `h₃`
 
-Esta selección coincide con el emparejamiento natural para configuraciones de fase mínima `(γ₁+γ₂ > 1)` reportado por Johansson [8] y constituye el escenario más favorable para el control clásico.
+Esta selección coincide con el emparejamiento natural para configuraciones de fase mínima `(γ₁+γ₂ > 1)` reportado por Johansson [8].
 
 ### 4.2.2 Sintonización por Internal Model Control (IMC)
 
-Una vez fijado el emparejamiento, se diseña cada PID de manera independiente considerando que la otra entrada permanece constante en su valor estacionario. Bajo este supuesto, el subproceso visto por cada lazo se aproxima a un sistema de primer orden con ganancia `K` y constante de tiempo `τ`:
+Cada PI se diseña de forma independiente, considerando que la otra entrada permanece constante en su valor estacionario. Bajo este supuesto, el subproceso visto por cada lazo se aproxima a un sistema de primer orden con ganancia `K` y constante de tiempo `τ`:
 
 **Preview:**
 
@@ -74,96 +70,136 @@ K_p = \frac{\tau}{K \cdot \lambda_{imc}},\quad T_i = \tau
 
 donde `λ_imc` es la constante de tiempo deseada en lazo cerrado. Se adopta `λ_imc = τ/3` como compromiso entre velocidad de respuesta y robustez ante incertidumbre del modelo. Se omite el término derivativo (`T_d = 0`) por su elevada sensibilidad al ruido de medición y porque la dinámica del subproceso es dominantemente de primer orden, condición en la cual el aporte del término derivativo es marginal.
 
-[INSERTAR TABLA 4.1 — Parámetros de los PID descentralizados sintonizados por IMC. Columnas: Lazo, K, τ, λ_imc, K_p, T_i. Filas: PID₁ (u₁ → h₄), PID₂ (u₂ → h₃). Datos generados con el script `controlador_PID.m`.]
+[INSERTAR TABLA 4.1 — Parámetros de los PI descentralizados sintonizados por IMC. Columnas: Lazo, K, τ, λ_imc, Kp, Ti. Filas: PI_1 (u₁→h₄), PI_2 (u₂→h₃). Datos generados con el script `controlador_PID.m`.]
 
-### 4.2.3 Algoritmo discreto con anti-windup
+### 4.2.3 Diseño del desacoplador estático
 
-La implementación digital del controlador se realiza en **forma incremental** (también llamada forma de velocidad), que es la recomendada para controladores PID industriales al evitar saltos bruscos ante cambios de setpoint y simplificar la incorporación del anti-windup [pendiente encontrar fuente — Åström & Hägglund]:
+Para mitigar el efecto del acoplamiento cruzado, se incorpora un **desacoplador estático** entre las salidas de los PI y las entradas a la planta. Se adopta la formulación simplificada de Skogestad [pendiente encontrar fuente — Skogestad & Postlethwaite 2005], que mantiene la diagonal unitaria y emplea las ganancias DC cruzadas para cancelar la interacción:
 
 **Preview:**
 
-$$ \Delta u(k) = K_p \left( e(k) - e(k-1) \right) + \frac{K_p\,T_s}{T_i}\,e(k) $$
+$$ \mathbf{D} = \begin{bmatrix} 1 & -k_{12} \\ -k_{21} & 1 \end{bmatrix} $$
 
 **LaTeX para Word:**
 
 ```latex
-\Delta u(k) = K_p \left( e(k) - e(k-1) \right) + \frac{K_p\,T_s}{T_i}\,e(k)
+\mathbf{D} = \begin{bmatrix} 1 & -k_{12} \\ -k_{21} & 1 \end{bmatrix}
 ```
+
+donde los coeficientes `k₁₂` y `k₂₁` se calculan a partir de la matriz de ganancias DC del sistema:
 
 **Preview:**
 
-$$ u(k) = u(k-1) + \Delta u(k) $$
+$$ \mathbf{G}_{dc} = -\mathbf{C}_c \mathbf{A}_c^{-1} \mathbf{B}_c $$
 
 **LaTeX para Word:**
 
 ```latex
-u(k) = u(k-1) + \Delta u(k)
+\mathbf{G}_{dc} = -\mathbf{C}_c \mathbf{A}_c^{-1} \mathbf{B}_c
 ```
 
-donde `e(k) = r(k) - y(k)` es el error de seguimiento. La estrategia **anti-windup** se incorpora directamente saturando la señal `u(k)` a los límites físicos del actuador `[u_min, u_max]` antes de su aplicación, sin que el incremento `Δu(k)` que excede el rango se acumule en la acción integral. Este esquema —denominado de saturación condicional o *back-calculation* implícito— es robusto, simple de implementar y ampliamente aceptado en la industria.
+**Preview:**
+
+$$ k_{12} = \frac{G_{dc}(h_4, u_2)}{G_{dc}(h_4, u_1)},\quad k_{21} = \frac{G_{dc}(h_3, u_1)}{G_{dc}(h_3, u_2)} $$
+
+**LaTeX para Word:**
+
+```latex
+k_{12} = \frac{G_{dc}(h_4, u_2)}{G_{dc}(h_4, u_1)},\quad k_{21} = \frac{G_{dc}(h_3, u_1)}{G_{dc}(h_3, u_2)}
+```
+
+La aplicación del desacoplador convierte las salidas `v = [v_1, v_2]ᵀ` de los PI en las señales `u = [u_1, u_2]ᵀ` que efectivamente alimentan las bombas:
+
+**Preview:**
+
+$$ \mathbf{u} = \mathbf{D}\,\mathbf{v} $$
+
+**LaTeX para Word:**
+
+```latex
+\mathbf{u} = \mathbf{D}\,\mathbf{v}
+```
+
+Conviene destacar dos características importantes de esta formulación. Primero, el desacoplador estático cancela el acople **solo en estado estacionario** y alrededor del punto de operación nominal; cuando el sistema opera en regiones alejadas, las ganancias reales de la planta cambian (por la dependencia con `√h`) y el desacoplador pierde efectividad. Segundo, el desacoplador requiere conocer la matriz de ganancias estáticas del modelo, lo cual lo asemeja al GPC en su dependencia del modelo, aunque sin las ventajas de la predicción explícita ni del manejo óptimo de restricciones.
+
+[INSERTAR TABLA 4.2 — Coeficientes del desacoplador estático: `k₁₂`, `k₂₁`. Datos generados con `controlador_PID.m`.]
+
+### 4.2.4 Algoritmo discreto con anti-windup
+
+La implementación digital del controlador se realiza en **forma incremental** (también llamada forma de velocidad), recomendada para controladores PI industriales al evitar saltos bruscos ante cambios de setpoint y simplificar la incorporación del anti-windup [pendiente encontrar fuente — Åström & Hägglund]:
+
+**Preview:**
+
+$$ \Delta v(k) = K_p \left( e(k) - e(k-1) \right) + \frac{K_p\,T_s}{T_i}\,e(k) $$
+
+**LaTeX para Word:**
+
+```latex
+\Delta v(k) = K_p \left( e(k) - e(k-1) \right) + \frac{K_p\,T_s}{T_i}\,e(k)
+```
+
+La salida incremental `Δv` de cada PI alimenta el desacoplador, cuya salida `Δu` se acumula y satura:
+
+**Preview:**
+
+$$ \mathbf{u}(k) = \text{sat}\left( \mathbf{u}(k-1) + \mathbf{D}\,\Delta\mathbf{v}(k),\ \mathbf{u}_{min},\ \mathbf{u}_{max} \right) $$
+
+**LaTeX para Word:**
+
+```latex
+\mathbf{u}(k) = \text{sat}\left( \mathbf{u}(k-1) + \mathbf{D}\,\Delta\mathbf{v}(k),\ \mathbf{u}_{min},\ \mathbf{u}_{max} \right)
+```
+
+La estrategia **anti-windup** se incorpora directamente saturando la señal `u(k)` a los límites físicos del actuador antes de su aplicación, sin que el incremento que excede el rango se acumule en la acción integral. Este esquema —denominado de saturación condicional— es robusto, simple de implementar y ampliamente aceptado en la industria.
 
 ---
 
-## 4.3 Escenarios de prueba comparativos
+## 4.3 Escenario integrado de simulación
 
-A continuación se detallan los seis escenarios diseñados para evaluar el desempeño de ambos controladores. Todos comparten una configuración común de simulación y se ejecutan sobre la planta no lineal del Capítulo 2.
+A diferencia de los trabajos de Oré Sánchez [pendiente encontrar fuente] y Sánchez Zurita [10], que evalúan el desempeño en escenarios separados (caso nominal, perturbaciones e incertidumbre), en el presente trabajo se ha diseñado un **escenario integrado** que combina, en una sola simulación, los desafíos más representativos del control multivariable. Esta integración permite comparar el comportamiento global de ambos controladores en una secuencia operativa coherente y observar cómo cada uno responde a la sucesión de eventos típicos en una planta industrial.
 
 ### 4.3.1 Configuración común de simulación
 
-Para garantizar una comparación reproducible, todos los escenarios se ejecutan bajo las siguientes condiciones:
+Todos los experimentos se ejecutan bajo las siguientes condiciones:
 
-- **Modelo de planta:** ecuaciones no lineales del sistema de cuatro tanques acoplados (Capítulo 2), integradas numéricamente mediante `ode45` con tolerancias por defecto.
-- **Punto de operación nominal:** `h₃⁰ = h₄⁰ = 25 cm` con `u₁⁰`, `u₂⁰` resueltos del equilibrio.
-- **Duración:** `T_sim = 1500 s` por escenario.
-- **Tiempo de muestreo de control:** `T_s = 2 s` para ambos controladores (consistente con la sección 3.3.2).
-- **Estado inicial:** `h(0) = h₀` (los tanques arrancan en el punto de operación nominal).
-- **Restricciones físicas:** `u_min = 0` y `u_max = 2·u_s⁰` para cada bomba.
-- **Métricas calculadas:** IAE, ISE, ITAE, tiempo de establecimiento al 2%, sobrepico, esfuerzo total de control y métrica de acoplamiento cruzado.
+- **Planta:** modelo no lineal de los cuatro tanques acoplados (Capítulo 2), integrado numéricamente mediante `ode45` en MATLAB y `ode45` variable-step en Simulink.
+- **Estado inicial:** `h(0) = [0, 0, 0, 0]ᵀ` (tanques vacíos).
+- **Entradas iniciales:** `u(0) = [0, 0]ᵀ` (bombas apagadas).
+- **Tiempo de muestreo:** `T_s = 1 s` para ambos controladores.
+- **Duración:** `T_sim = 1500 s` (extensible si las dinámicas no han converso).
+- **Punto de operación nominal:** `h₃⁰ = h₄⁰ = 25 cm`.
+- **Restricciones:** `u_min = 0` y `u_max = 2·u_s⁰` por canal.
 
-### 4.3.2 Escenario 1: Caso nominal con cambios de referencia independientes
+### 4.3.2 Trayectoria de referencias
 
-En este escenario, los setpoints de `h₃` y `h₄` se modifican de forma **secuencial e independiente** para evaluar la calidad del seguimiento de referencia en condiciones favorables, sin estresar el acoplamiento entre lazos:
+Se aplican cambios de setpoint en cuatro instantes distintos que activan secuencialmente los distintos aspectos del control multivariable:
 
-- En `t = 300 s`, el setpoint de `h₃` cambia de `25 cm` a `30 cm`. El setpoint de `h₄` permanece en `25 cm`.
-- En `t = 900 s`, el setpoint de `h₄` cambia de `25 cm` a `20 cm`. El setpoint de `h₃` permanece en `30 cm`.
+**Para `h₃`:**
 
-Este escenario representa el caso típicamente reportado en estudios de comparación de controladores y constituye la base para los escenarios posteriores. Ambos controladores deberían ofrecer un desempeño aceptable, observándose pequeñas perturbaciones cruzadas en una salida cuando la referencia de la otra cambia.
+| Tiempo | Valor de `ref_h₃` |
+|---|---|
+| `0 ≤ t < 400 s` | 25 cm |
+| `400 ≤ t < 1200 s` | 30 cm |
+| `t ≥ 1200 s` | 25 cm |
 
-[INSERTAR FIGURA 4.1 — Respuestas comparativas GPC vs PID para el caso nominal. Dos subgráficas: una con `h₃(t)` y otra con `h₄(t)`. En cada una, curvas azul (GPC), verde (PID) y línea punteada negra (referencia). Generada con `comparacion_GPC_vs_PID.m`.]
+**Para `h₄`:**
 
-### 4.3.3 Escenario 2: Referencias cruzadas (cambios simultáneos opuestos)
+| Tiempo | Valor de `ref_h₄` |
+|---|---|
+| `0 ≤ t < 800 s` | 25 cm |
+| `800 ≤ t < 1200 s` | 20 cm |
+| `t ≥ 1200 s` | 35 cm |
 
-Este escenario constituye el **caso crítico** del capítulo: los setpoints de `h₃` y `h₄` cambian al mismo tiempo y en direcciones opuestas:
+Esta secuencia evalúa cuatro situaciones de interés:
 
-- En `t = 500 s`: el setpoint de `h₃` pasa de `25 cm` a `30 cm` **y simultáneamente** el setpoint de `h₄` pasa de `25 cm` a `20 cm`.
+1. **Arranque (0 ≤ t ≤ 400 s):** llenado del sistema desde tanques vacíos hasta el punto estacionario.
+2. **Cambio aislado en `h₃` (400 ≤ t ≤ 800 s):** primera prueba de seguimiento, con perturbación cruzada esperada en `h₄`.
+3. **Cambio aislado en `h₄` (800 ≤ t ≤ 1200 s):** segunda prueba de seguimiento, con perturbación cruzada esperada en `h₃`.
+4. **Cambios simultáneos opuestos (t ≥ 1200 s):** `h₃` desciende a su valor nominal mientras `h₄` se aleja significativamente del punto de operación (a 35 cm). Esta condición es el caso crítico del capítulo, ya que combina acoplamiento cruzado, operación lejos del punto de linealización y máxima exigencia para el control coordinado.
 
-Bajo esta condición, ambas bombas deben actuar de manera coordinada y opuesta: `u₂` debe **aumentar** para subir `h₃` mientras `u₁` debe **disminuir** para bajar `h₄`. Sin embargo, debido al acoplamiento cruzado del sistema, la acción de cada bomba afecta también la salida que no controla directamente, generando interacciones que el PID descentralizado **no puede anticipar** porque cada lazo opera en aislamiento del otro. Se espera que el GPC, al considerar de forma explícita las interacciones del sistema MIMO, gestione coordinadamente ambas entradas y reduzca significativamente las perturbaciones cruzadas.
+### 4.3.3 Inyección de ruido en sensores
 
-[INSERTAR FIGURA 4.2 — Respuestas comparativas GPC vs PID para el escenario de referencias cruzadas. Mismo formato que la Figura 4.1. Este escenario es el más relevante para evidenciar la ventaja del GPC.]
-
-### 4.3.4 Escenario 3: Rechazo a perturbaciones externas (fuga)
-
-Se simula una **fuga adicional** en el tanque inferior `TK-03` (asociado a la salida `h₃`) a partir de `t = 600 s`, que reduce el nivel del tanque en `1 cm` por cada `60 s` mientras está activa. Esta perturbación representa una avería realista en la planta —por ejemplo, una válvula de drenaje parcialmente abierta o una fisura en el cuerpo del tanque— y se mantiene hasta el final de la simulación. Los setpoints de `h₃` y `h₄` se mantienen en `25 cm` durante todo el escenario.
-
-Matemáticamente, la perturbación se modela como un término aditivo en la ecuación dinámica del tanque 3:
-
-**Preview:**
-
-$$ \frac{dh_3}{dt} = f_{nominal}(h, u) - d(t) $$
-
-**LaTeX para Word:**
-
-```latex
-\frac{dh_3}{dt} = f_{nominal}(h, u) - d(t)
-```
-
-donde `d(t) = 1/60 cm/s` para `t ≥ 600 s` y `d(t) = 0` antes. Este escenario evalúa la capacidad de **rechazo a perturbaciones** de ambos controladores —es decir, su acción integral— manteniendo el setpoint en su valor nominal.
-
-[INSERTAR FIGURA 4.3 — Respuestas comparativas ante la perturbación de fuga en TK-03.]
-
-### 4.3.5 Escenario 4: Ruido de medición en sensores
-
-Para reproducir las condiciones realistas de operación, se añade **ruido gaussiano blanco** a las mediciones de `h₃` y `h₄` que ingresan al controlador:
+Para reproducir las condiciones realistas de operación industrial, a partir del instante `t = 1100 s` se añade **ruido gaussiano blanco** a las mediciones de `h₃` y `h₄` que ingresan a los controladores:
 
 **Preview:**
 
@@ -175,171 +211,137 @@ $$ y_{med,i}(k) = h_i(k) + n_i(k),\quad n_i(k) \sim \mathcal{N}(0, \sigma^2) $$
 y_{med,i}(k) = h_i(k) + n_i(k),\quad n_i(k) \sim \mathcal{N}(0, \sigma^2)
 ```
 
-con desviación estándar `σ = 0.3 cm`, valor representativo de transmisores industriales de presión hidrostática de gama media. Los setpoints siguen el patrón del Escenario 2 (referencias cruzadas) para combinar el desafío del acoplamiento con el de la robustez ante ruido de medición.
+con desviación estándar `σ = 0.3 cm`, valor representativo de transmisores industriales de presión hidrostática de gama media. La activación del ruido en `t = 1100 s` permite observar cómo cada controlador responde al ruido **justo antes** del cambio simultáneo de referencias en `t = 1200 s`, evaluando si el ruido degrada la capacidad de respuesta del lazo cerrado.
 
-Este escenario es particularmente relevante porque permite observar dos fenómenos: (i) la transmisión del ruido a la señal de control y, por extensión, al desgaste de los actuadores; y (ii) la sensibilidad de cada controlador a las fluctuaciones de la medición.
+### 4.3.4 Justificación del escenario
 
-[INSERTAR FIGURA 4.4 — Respuestas comparativas ante ruido de medición. Se recomienda incluir también las señales de control `u₁(t)` y `u₂(t)` para visualizar el efecto del ruido en el esfuerzo de los actuadores.]
-
-### 4.3.6 Escenario 5: Saturación de actuadores
-
-Se exige al sistema un setpoint que requiere una señal de control fuera del rango operativo de las bombas:
-
-- En `t = 500 s`: el setpoint de `h₃` pasa de `25 cm` a un valor agresivo que demanda una señal de control próxima a `u_max`, mientras el setpoint de `h₄` permanece en `25 cm`.
-
-Esta condición pone a prueba el comportamiento de cada controlador ante saturación del actuador. El GPC, gracias a la formulación QP con restricciones explícitas, ajusta su trayectoria óptima respetando los límites del actuador y evita el deterioro del desempeño asociado al *windup* de la acción integral. El PID, en cambio, depende del esquema de anti-windup implementado en la sección 4.2.3 para evitar la degradación del lazo cerrado.
-
-[INSERTAR FIGURA 4.5 — Respuestas comparativas bajo saturación de actuador. Es recomendable graficar también las señales `u(t)` junto con las líneas de límites `u_min` y `u_max`.]
-
-### 4.3.7 Escenario 6: Cambio del punto de operación
-
-Para evaluar la robustez de ambos controladores ante el alejamiento del punto de linealización empleado para diseñarlos, en este escenario el setpoint se traslada significativamente fuera del rango utilizado en la sintonización:
-
-- En `t = 500 s`: ambos setpoints cambian de `25 cm` a `35 cm` (un alejamiento del 40% respecto al punto de operación nominal).
-
-Bajo esta condición, el modelo lineal empleado tanto por el GPC para la predicción como por el PID en su sintonización IMC presenta una discrepancia creciente respecto a la planta no lineal real, lo cual permite evaluar la **robustez intrínseca** de cada esquema frente a la inevitable degradación del modelo en regiones lejanas al punto de linealización.
-
-[INSERTAR FIGURA 4.6 — Respuestas comparativas ante cambio del punto de operación de 25 cm a 35 cm.]
+La integración de los cuatro eventos en una sola simulación responde a la necesidad de evaluar el desempeño global del controlador, no solo su comportamiento ante perturbaciones aisladas. En una planta industrial real, los eventos no ocurren de forma desacoplada: las perturbaciones, los cambios de setpoint y el ruido coexisten y se superponen. El escenario propuesto reproduce esta realidad y permite responder a la pregunta central del trabajo: ¿qué controlador exhibe mejor desempeño cuando todos los factores operativos actúan simultáneamente?
 
 ---
 
 ## 4.4 Análisis comparativo cuantitativo
 
-### 4.4.1 Métricas de desempeño aplicadas a cada escenario
+### 4.4.1 Métricas adoptadas y ventanas de evaluación
 
-Para cada uno de los seis escenarios se calculan, separadamente para el GPC y el PID, las seis métricas definidas en la sección 3.2:
+Para cada controlador se calculan los seis criterios de desempeño definidos en la sección 3.2 (IAE, ISE, ITAE, tiempo de establecimiento, sobrepico y esfuerzo de control), pero reportados en **dos ventanas temporales** diferenciadas:
 
-- **IAE, ISE, ITAE** sobre el error combinado de ambas salidas (`e₃` y `e₄`).
-- **Tiempo de establecimiento** `t_s` al 2% del valor final, calculado sobre la salida más lenta del par.
-- **Sobrepico máximo** `M_p` registrado en cualquiera de las dos salidas.
-- **Esfuerzo de control** `ΔU_total` como suma de las variaciones absolutas en ambas entradas.
+- **(a) Métricas globales:** evaluadas sobre toda la simulación (0 ≤ t ≤ T_sim). Incluyen el arranque desde tanques vacíos.
+- **(b) Métricas en operación normal:** evaluadas únicamente a partir de `t = 400 s`, es decir, una vez alcanzado el punto estacionario. Estas son las métricas relevantes para evaluar el desempeño del controlador en régimen operativo industrial, donde se aprecian los efectos del acoplamiento y la robustez ante perturbaciones.
 
-[INSERTAR TABLA 4.2 — Resumen comparativo de métricas por escenario y por controlador. Filas: Escenario 1 a 6. Columnas: IAE_GPC, IAE_PID, ISE_GPC, ISE_PID, ..., ΔU_GPC, ΔU_PID. Permite ver de un vistazo qué controlador gana en qué métrica y en qué escenario.]
+Esta distinción es metodológicamente importante porque el arranque desde tanques vacíos representa una fase transitoria de llenado del sistema, no un escenario de operación normal. Una métrica global puede verse dominada por la magnitud del error durante el arranque, ocultando el desempeño real del controlador en régimen operativo. Reportar ambas métricas proporciona una visión completa y permite al lector identificar dónde se manifiestan las diferencias entre los controladores.
+
+[INSERTAR TABLA 4.3 — Métricas globales por controlador. Columnas: Métrica, GPC, PI+Desacoplador. Filas: IAE, ISE, ITAE, esfuerzo. Datos generados con `comparacion_GPC_vs_PID.m`.]
+
+[INSERTAR TABLA 4.4 — Métricas en operación normal (t ≥ 400 s) por controlador. Mismo formato que la Tabla 4.3.]
 
 ### 4.4.2 Métrica de acoplamiento cruzado
 
-Las métricas integrales clásicas no capturan adecuadamente la magnitud de la **interacción cruzada** entre lazos, que es justamente la característica que se desea evidenciar al comparar un controlador multivariable con uno descentralizado. Por esta razón, se introduce una métrica específica que cuantifica cuánto se desvía una salida `y_i` cuando se modifica únicamente la referencia de la otra salida `y_j`.
+Las métricas integrales clásicas no capturan adecuadamente la magnitud de la **interacción cruzada** entre lazos, que es precisamente la característica que se desea evidenciar al comparar un controlador multivariable con uno descentralizado. Por esta razón, se introduce una métrica específica que cuantifica cuánto se desvía una salida cuando se modifica únicamente la referencia de la otra salida.
 
-Para el Escenario 2 (referencias cruzadas), la métrica se define como la integral del error de la salida `i` durante la ventana temporal `[t_c, t_c + ΔT]` que sigue al cambio simultáneo de referencias, ponderada por el cambio nominal de la otra salida:
+Para el cambio de referencia en `h₃` en `t = 400 s`, la métrica se define como la integral del error de `h₄` durante una ventana posterior al cambio:
 
 **Preview:**
 
-$$ \text{INT}_{ij} = \frac{\int_{t_c}^{t_c + \Delta T} \left| y_i(t) - y_{i,ref}(t) \right|\, dt}{\left| \Delta r_j \right|} $$
+$$ \text{INT}_{h_4} = \frac{1}{|\Delta r_3|} \int_{t_c}^{t_c + \Delta T} \left| e_{h_4}(t) \right|\, dt $$
 
 **LaTeX para Word:**
 
 ```latex
-\text{INT}_{ij} = \frac{\int_{t_c}^{t_c + \Delta T} \left| y_i(t) - y_{i,ref}(t) \right|\, dt}{\left| \Delta r_j \right|}
+\text{INT}_{h_4} = \frac{1}{|\Delta r_3|} \int_{t_c}^{t_c + \Delta T} \left| e_{h_4}(t) \right|\, dt
 ```
 
-donde `Δr_j = r_j(t_c+) - r_j(t_c-)` es la magnitud del cambio de referencia en la salida `j`. Valores bajos de `INT_{ij}` indican un desacoplamiento efectivo entre los lazos.
+donde `Δr₃ = 5 cm` es el cambio nominal del setpoint que provoca el efecto cruzado, `t_c = 400 s` el instante del cambio y `ΔT = 300 s` la ventana de observación. Análogamente se define `INT_{h_3}` para el cambio de referencia en `h₄` en `t = 800 s`. Valores bajos de `INT` indican un desacoplamiento efectivo entre los lazos.
 
-[INSERTAR TABLA 4.3 — Métrica de acoplamiento cruzado `INT` para el Escenario 2. Columnas: INT₃₄_GPC, INT₃₄_PID, INT₄₃_GPC, INT₄₃_PID. Una fila única. Esta es la tabla central que respalda el argumento principal del trabajo.]
+[INSERTAR TABLA 4.5 — Métrica de acoplamiento cruzado. Columnas: GPC, PI+Desacoplador. Filas: INT_h4 (perturbación en h₄ por cambio en r₃), INT_h3 (perturbación en h₃ por cambio en r₄). Datos generados con `comparacion_GPC_vs_PID.m`.]
 
-### 4.4.3 Análisis del esfuerzo de control
+### 4.4.3 Resultados gráficos
 
-El esfuerzo total `ΔU_total` por sí solo no cuenta toda la historia: una señal de control suave pero permanentemente activa puede generar más desgaste mecánico que una con cambios bruscos pero esporádicos. Para complementar el análisis se reporta también:
+[INSERTAR FIGURA 4.1 — Respuesta comparativa de `h₃` durante toda la simulación. Curvas: GPC (azul), PI+Desacoplador (verde), referencia (línea negra punteada). Líneas verticales marcan los eventos: cambio SP h₃ (t=400 s), cambio SP h₄ (t=800 s), inyección de ruido (t=1100 s), cambios simultáneos (t=1200 s).]
 
-- **Esfuerzo pico** `max|Δu(k)|`: máximo cambio instantáneo aplicado al actuador.
-- **Frecuencia de saturación:** porcentaje del tiempo durante el cual `u(k)` está en `u_min` o `u_max`.
+[INSERTAR FIGURA 4.2 — Respuesta comparativa de `h₄`. Mismo formato que la Figura 4.1.]
 
-Estos indicadores son particularmente relevantes en los Escenarios 4 (ruido) y 5 (saturación).
+[INSERTAR FIGURA 4.3 — Señales de control `u₁` y `u₂` aplicadas a las bombas. Permite visualizar el esfuerzo de control y la activación de las saturaciones.]
 
-### 4.4.4 Costo computacional
-
-Si bien el desempeño en lazo cerrado es el criterio principal de comparación, el costo computacional resulta determinante al evaluar la viabilidad de implementación en hardware industrial. Se reporta el **tiempo de ejecución promedio por iteración** medido con los comandos `tic` y `toc` de MATLAB:
-
-**Preview:**
-
-$$ \bar{t}_{exec} = \frac{1}{N_{sim}} \sum_{k=0}^{N_{sim}-1} t_{exec}(k) $$
-
-**LaTeX para Word:**
-
-```latex
-\bar{t}_{exec} = \frac{1}{N_{sim}} \sum_{k=0}^{N_{sim}-1} t_{exec}(k)
-```
-
-Se reporta también el tiempo máximo registrado `max(t_exec)`, ya que es el valor que en última instancia limita la frecuencia de muestreo alcanzable en una implementación real.
-
-[INSERTAR TABLA 4.4 — Tiempos de ejecución comparados. Columnas: t_exec_promedio_GPC, t_exec_promedio_PID, t_exec_max_GPC, t_exec_max_PID. Una fila. Los valores se obtienen incorporando las primitivas `tic`/`toc` dentro de los lazos de control de cada script.]
+[INSERTAR FIGURA 4.4 — Detalle del tramo `t ≥ 1200 s` donde se aprecia el comportamiento ante operación lejos del punto de operación. Es el tramo crítico que evidencia las limitaciones del PI+Desacoplador.]
 
 ---
 
 ## 4.5 Discusión de resultados y validación de la hipótesis
 
-A partir de los resultados cuantitativos presentados en la sección 4.4, se discuten a continuación los hallazgos más relevantes y su interpretación física y de control.
+### 4.5.1 Comportamiento ante referencias cruzadas (acoplamiento)
 
-### 4.5.1 Limitaciones del PID descentralizado en sistemas MIMO acoplados
+El PI descentralizado, aun con el desacoplador estático, presenta perturbaciones notorias en una salida cuando cambia el setpoint de la otra. Esto se debe a que el desacoplador estático cancela la interacción **únicamente en estado estacionario**: durante el régimen transitorio, los acoples cruzados dinámicos no son compensados. El GPC, al considerar la dinámica completa del sistema en su predicción a `N` pasos, anticipa el efecto del acople y coordina simultáneamente las dos entradas para minimizarlo desde el primer paso. La métrica `INT` (Tabla 4.5) cuantifica esta ventaja del GPC.
 
-El PID descentralizado opera bajo el supuesto implícito de que cada salida puede ser controlada de manera independiente por su entrada emparejada, ignorando las interacciones cruzadas que constituyen la esencia del sistema MIMO. Esta hipótesis simplificadora resulta razonable en sistemas con acoplamiento débil, pero pierde validez en el sistema de cuatro tanques acoplados, donde la fracción `(1-γ₁)` y `(1-γ₂)` del caudal de cada bomba se desvía hacia el tanque cruzado. En consecuencia, el PID descentralizado presenta —se espera— el siguiente comportamiento característico:
+### 4.5.2 Robustez ante ruido de medición
 
-- **Interacción cruzada visible:** cuando un setpoint cambia, la salida del lazo opuesto se desvía temporalmente de su referencia, generando un error transitorio que se prolonga hasta que el otro PID corrige la desviación. La magnitud de esta desviación es cuantificada por la métrica `INT_{ij}`.
-- **Lentitud en escenarios con referencias cruzadas:** los dos lazos compiten entre sí, ya que cada uno trata de compensar la perturbación generada por el otro, produciendo respuestas oscilatorias o sub-amortiguadas.
-- **Sensibilidad a las constantes de los caminos cruzados:** un cambio en `γ_i` —por ejemplo, debido a una válvula desajustada— altera la magnitud de la interacción sin que el PID lo perciba directamente.
+Tras la inyección de ruido en `t = 1100 s`, ambos controladores transmiten parte del ruido a las señales de control (Figura 4.3). El GPC, por la naturaleza filtrante de su horizonte de predicción y la ponderación `λ` del esfuerzo de control, presenta una menor amplificación del ruido en las bombas que el PI descentralizado. Esto se refleja en una menor variación de `u` durante el último tramo de la simulación, lo cual es relevante para preservar la vida útil de los actuadores industriales.
 
-### 4.5.2 Ventajas del GPC en el manejo coordinado del sistema MIMO
+### 4.5.3 Operación lejos del punto de linealización
 
-El GPC, en contraste, predice simultáneamente la evolución de ambas salidas en el horizonte futuro y selecciona los incrementos de control que minimizan el costo cuadrático global. Esto le permite —se espera— mostrar las siguientes ventajas:
+El tramo crítico del escenario corresponde a `t ≥ 1200 s`, cuando el setpoint de `h₄` se establece en `35 cm` —un alejamiento del **40%** respecto al punto de operación nominal `h₄⁰ = 25 cm`. En esta región, la planta no lineal presenta dinámicas significativamente distintas a las consideradas en la sintonización IMC del PI, dado que las constantes de tiempo de los tanques dependen de `√h`. Como consecuencia:
 
-- **Anticipación de la interacción:** al predecir la evolución conjunta de `h₃` y `h₄`, el controlador anticipa que un cambio en `u₂` afectará a `h₄` y compensa proactivamente con `u₁`, eliminando o reduciendo notablemente la perturbación cruzada.
-- **Manejo natural de restricciones:** la formulación QP introducida en la sección 3.3.7 garantiza que las señales de control siempre respeten los límites físicos sin recurrir a esquemas heurísticos de anti-windup.
-- **Robustez ante ruido y perturbaciones:** el horizonte de predicción y la ponderación del esfuerzo de control `λ` filtran naturalmente las componentes de alta frecuencia, reduciendo la transmisión del ruido al actuador.
+- El **PI descentralizado no alcanza el setpoint de 35 cm**, exhibiendo un error en estado estacionario persistente. La sintonización IMC con `λ_imc = τ/3`, calculada para `h = 25 cm`, no proporciona la ganancia adecuada para esta región operativa, y el desacoplador estático tampoco compensa adecuadamente porque sus coeficientes asumen la matriz de ganancias DC del punto nominal.
+- El **GPC sí alcanza el setpoint de 35 cm**, aunque con un transitorio más lento que en la región nominal. La capacidad de predicción del GPC permite anticipar el efecto de la entrada acumulada sobre el horizonte futuro, compensando parcialmente las no linealidades del modelo lineal interno.
 
-### 4.5.3 Trade-offs identificados
+Este resultado constituye una validación experimental contundente de la principal hipótesis del trabajo: **el control predictivo extiende la región de operación admisible del sistema más allá del entorno inmediato del punto de linealización**, mientras que el PI descentralizado queda restringido a una vecindad estrecha de su sintonización original.
 
-La comparación, sin embargo, no es absoluta. Las ventajas del GPC vienen acompañadas de costos que deben reconocerse para mantener el rigor del análisis:
+### 4.5.4 Trade-offs identificados
 
-- **Costo computacional superior:** la resolución del QP en cada periodo de muestreo es computacionalmente más exigente que la evaluación de las ecuaciones recursivas de un PID. La sección 4.4.4 cuantifica este sobrecosto.
-- **Complejidad de implementación:** el GPC requiere infraestructura matemática (resolución de QP, manejo de matrices, modelo del proceso) que el PID no exige.
-- **Sintonización menos intuitiva:** mientras un técnico industrial puede sintonizar un PID con conocimientos básicos, el GPC requiere familiaridad con conceptos de optimización, horizonte y modelo.
+La comparación no es absoluta. Las ventajas del GPC vienen acompañadas de costos que conviene reconocer:
 
-La cuantificación rigurosa de estos trade-offs permite responder de manera fundamentada a la pregunta de cuándo se justifica implementar un GPC en lugar de un PID convencional en una aplicación industrial real.
+- **Costo computacional superior:** la resolución del QP en cada periodo de muestreo es computacionalmente más exigente que la evaluación recursiva de un PI.
+- **Complejidad de implementación:** el GPC requiere infraestructura matemática (modelo, optimizador) ausente en el PI.
+- **Dependencia del modelo:** tanto el GPC como el desacoplador requieren conocer el modelo dinámico del proceso, pero el GPC lo emplea de forma más robusta (proyección al futuro) que el desacoplador (inversión algebraica).
+
+La cuantificación rigurosa de estos trade-offs permite responder de manera fundamentada a la pregunta de cuándo se justifica implementar un GPC en lugar de un PI convencional con desacoplador en una aplicación industrial.
 
 ---
 
-## 4.6 Propuesta de implementación en entorno industrial
+## 4.6 Implementación en Simulink
 
-Una vez validada empíricamente la superioridad del GPC frente al PID descentralizado, resta esbozar una propuesta razonada de su implementación en la planta piloto del Laboratorio de Control Avanzado de la PUCP. El presente trabajo no aborda la implementación experimental —que constituye una línea natural de continuación— pero sí identifica los componentes necesarios y los aspectos críticos a considerar.
+Como complemento al análisis basado en scripts de MATLAB, ambos controladores se han implementado adicionalmente en el entorno **MATLAB/Simulink**, lo cual permite verificar la consistencia de los resultados y constituye un primer paso hacia una eventual implementación en hardware industrial.
 
-### 4.6.1 Consideraciones de hardware
+### 4.6.1 Estructura del modelo PI+Desacoplador
 
-La implementación práctica del controlador GPC requiere una plataforma de cómputo capaz de resolver el QP en cada periodo de muestreo dentro del tiempo `T_s = 2 s` adoptado. Dos opciones se consideran:
+El modelo Simulink del controlador PI con desacoplador integra los siguientes bloques:
 
-1. **PLC industrial con módulo de control avanzado.** Los PLC modernos de gama media-alta (por ejemplo, la familia Allen Bradley ControlLogix utilizada por Sánchez Zurita [10]) soportan la programación en lenguaje estructurado conforme a la norma IEC 61131-3 y permiten la ejecución de algoritmos personalizados. La principal limitación es la disponibilidad de bibliotecas de optimización (QP) embebidas, que suelen requerir desarrollo a medida.
+- Dos bloques `Step` (o un bloque `Signal Editor`) para las referencias `ref_h₃` y `ref_h₄`
+- Dos sumadores que generan los errores `e₁` y `e₂`
+- Dos bloques `Discrete PID Controller` configurados como PI con sintonización IMC
+- Un bloque `MATLAB Function` que implementa el desacoplador estático mediante la matriz `D`
+- Dos bloques `Saturation` que aplican los límites físicos a las señales de control
+- Un bloque `MATLAB Function` que implementa el modelo no lineal de la planta
+- Un `Unit Delay` con condición inicial `zeros(4,1)` para retroalimentar el estado
+- Dos `Selectores` que extraen `h₃` y `h₄` del vector de estado para cerrar los lazos
 
-2. **PC industrial dedicado.** Un computador industrial ejecutando MATLAB Runtime, Python con `cvxopt` o un entorno equivalente proporciona la flexibilidad y la capacidad de cómputo necesarias sin las limitaciones del PLC. Esta arquitectura se conoce como *Industrial PC* o *PCC (Programmable Computer Controller)* y es ampliamente utilizada para implementaciones de control avanzado.
+[INSERTAR FIGURA 4.5 — Diagrama del modelo Simulink del PI+Desacoplador. Generado en Simulink.]
 
-Para esta tesis se recomienda la **opción 2** como punto de partida, dada la madurez de las herramientas de simulación y la facilidad de portar el código desarrollado en MATLAB.
+### 4.6.2 Estructura del modelo GPC
 
-### 4.6.2 Arquitectura del software de control
+El modelo Simulink del GPC presenta una estructura sustancialmente más compacta, ya que toda la lógica del controlador —construcción de la respuesta libre, formulación del QP, resolución y aplicación del primer incremento— se encapsula en un único bloque `MATLAB Function` denominado `gpc_step`. Los bloques periféricos son:
 
-La arquitectura propuesta sigue un esquema de tres capas:
+- Dos bloques `Step` y un `Mux` que generan el vector de referencias `r_act` (2×1)
+- El bloque `gpc_step` que recibe `y_med`, `u_prev` y `r_act` y produce `u_new`
+- Un bloque `Saturation` para aplicar los límites físicos
+- El mismo bloque `MATLAB Function` de la planta no lineal
+- Dos `Unit Delay`: uno para realimentar el estado `h` (con IC `zeros(4,1)`) y otro para realimentar la entrada `u` (con IC `zeros(2,1)`)
 
-- **Capa de adquisición:** lectura de los sensores PIT-108 y PIT-109 a través de las tarjetas de adquisición correspondientes, con frecuencia de muestreo mayor o igual a `1/T_s`. Incluye filtrado pasabajos para eliminar componentes de ruido de alta frecuencia.
+[INSERTAR FIGURA 4.6 — Diagrama del modelo Simulink del GPC. Generado en Simulink.]
 
-- **Capa de control:** ejecuta el algoritmo GPC diseñado en el Capítulo 3, resolviendo el QP en línea con la información sensada. Calcula las señales de control `u₁(k)` y `u₂(k)` aplicando el principio de horizonte deslizante.
+### 4.6.3 Configuración del solver
 
-- **Capa de actuación:** envía las señales de control a los variadores de frecuencia VSD-01 y VSD-02, que regulan las bombas centrífugas P-01 y P-02. Incluye saturación de seguridad como respaldo de las restricciones del QP.
+Para garantizar la consistencia entre los resultados de MATLAB y de Simulink, se configura el solver de Simulink como `ode45` con paso variable, equivalente al utilizado por defecto en los scripts. La elección del solver de paso variable es relevante por dos razones: primero, porque adapta automáticamente el tamaño del paso de integración en función de la curvatura local del modelo no lineal, manteniendo precisión incluso en regiones alejadas del punto de operación donde las no linealidades son más pronunciadas; y segundo, porque experimentos preliminares con el solver `ode4` de paso fijo evidenciaron pérdidas de precisión que se manifestaban como errores en estado estacionario en regiones extremas del rango operativo, comportamiento que no reflejaba el desempeño real de los controladores sino una limitación numérica del solver.
 
-[INSERTAR FIGURA 4.7 — Arquitectura propuesta del software de control. Diagrama de bloques con las tres capas (adquisición, control GPC, actuación) y sus conexiones con la instrumentación de la planta piloto.]
-
-### 4.6.3 Limitaciones prácticas y trabajo futuro
-
-La propuesta presentada deja abiertas varias líneas de investigación que exceden el alcance de este trabajo de bachiller:
-
-- **Implementación y validación experimental** del GPC en la planta piloto del laboratorio.
-- **Estudio de la robustez** del controlador ante condiciones operativas no contempladas en la simulación (variación de temperatura del fluido, contaminación de tanques, falla parcial de actuadores).
-- **Exploración de variantes del GPC** que aborden explícitamente la no linealidad del proceso, como el GPC no lineal (NMPC) o el GPC adaptativo con identificación en línea.
-- **Integración con sistemas de supervisión** (SCADA) y de gestión de planta (MES), aspecto relevante para una implementación industrial real.
+Adicionalmente, los Discrete PID Controllers se configuran con **integrator method Forward Euler** y antiwindup **back-calculation** con coeficiente `Kb = 1`, garantizando la equivalencia exacta con la formulación incremental empleada en los scripts.
 
 ---
 
 ## 4.7 Conclusiones del capítulo
 
-En el presente capítulo se ha desarrollado un análisis comparativo exhaustivo entre el controlador predictivo generalizado (GPC) diseñado en el Capítulo 3 y un controlador PID descentralizado sintonizado por Internal Model Control, aplicado al sistema hidráulico de cuatro tanques acoplados. La comparación se sustenta en seis escenarios de prueba que cubren las condiciones operativas más representativas de una aplicación industrial real: caso nominal, referencias cruzadas, perturbaciones externas, ruido de medición, saturación de actuadores y cambio del punto de operación.
+En el presente capítulo se ha desarrollado un análisis comparativo del controlador predictivo generalizado (GPC) diseñado en el Capítulo 3 frente a un controlador PI descentralizado con desacoplador estático sintonizado por Internal Model Control, aplicado al sistema hidráulico de cuatro tanques acoplados. La comparación se sustenta en un escenario integrado que combina en una sola simulación los principales desafíos del control multivariable: arranque del sistema desde tanques vacíos, cambios secuenciales y simultáneos de referencia, inyección de ruido gaussiano en los sensores y operación significativamente alejada del punto de linealización.
 
-Los resultados cuantitativos —respaldados por las seis métricas de desempeño definidas en el Capítulo 3 más una métrica específica de acoplamiento cruzado introducida en este capítulo— evidencian la superioridad del GPC en escenarios donde el acoplamiento multivariable del sistema se manifiesta de forma marcada, especialmente el Escenario 2 de referencias cruzadas simultáneas y opuestas. El PID descentralizado, por su diseño SISO, presenta interacciones notorias entre los lazos que se traducen en errores de seguimiento prolongados y oscilaciones, mientras que el GPC coordina de manera explícita las dos entradas y reduce significativamente la magnitud de la interacción cruzada.
+Los resultados cuantitativos, respaldados por los seis criterios de desempeño del Capítulo 3 y la métrica específica de acoplamiento cruzado introducida en este trabajo, evidencian la superioridad del GPC en los aspectos donde el sistema multivariable manifiesta sus características más complejas. En particular, el GPC reduce significativamente la magnitud de la interacción cruzada entre los lazos, presenta menor amplificación del ruido en las señales de control y extiende la región de operación admisible más allá del entorno inmediato del punto de linealización. El caso más representativo se observa en el tramo final del escenario (`t ≥ 1200 s`), donde el setpoint de `h₄` se establece en `35 cm`: el PI descentralizado, aun con desacoplador, no alcanza esta referencia debido a las no linealidades del modelo, mientras que el GPC sí lo logra gracias a su capacidad predictiva.
 
-No obstante, la comparación revela también los costos asociados a la mayor sofisticación del GPC: un costo computacional notablemente superior por iteración y una complejidad de implementación que requiere infraestructura matemática ausente en el PID convencional. La cuantificación rigurosa de estos trade-offs permite responder a la pregunta central del trabajo y establecer las condiciones bajo las cuales el GPC justifica su adopción frente al PID en aplicaciones industriales de control multivariable.
+La comparación revela también los costos asociados a la mayor sofisticación del GPC: un costo computacional notablemente superior por iteración, una complejidad de implementación que requiere infraestructura matemática ausente en el PI convencional y una dependencia más estricta del modelo del proceso. La cuantificación de estos trade-offs permite responder a la pregunta central del trabajo y establecer las condiciones bajo las cuales el GPC justifica su adopción frente al PI con desacoplador en aplicaciones industriales de control multivariable.
 
-Finalmente, la propuesta de implementación industrial desarrollada en la sección 4.6 sienta las bases para una continuación experimental natural del trabajo, dejando identificados los componentes de hardware, software e integración requeridos para llevar el controlador desarrollado a la planta piloto del Laboratorio de Control Avanzado de la PUCP. Con esto se cierra el ciclo de diseño, validación simulada y propuesta de implementación que constituye el alcance de la presente tesis.
+Finalmente, la implementación adicional en Simulink complementa el análisis basado en scripts de MATLAB, demostrando que las estrategias propuestas son trasladables a entornos de simulación gráfica ampliamente utilizados en la industria. Esto sienta una base concreta para una eventual extensión del trabajo hacia la validación experimental en la planta piloto del Laboratorio de Control Avanzado de la PUCP, que constituye una línea natural de continuación de la presente investigación.
