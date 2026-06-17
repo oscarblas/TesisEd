@@ -209,19 +209,26 @@ A_ineq_static = [ eye(nu*Nu);
 % ========================================================================
 [Ad, Bd, Cd, Dd] = ssdata(sys_d);
 
-% Tiempo de simulacion y vector de referencia
+% Tiempo de simulacion y escenario (arranque desde h=0, cambios de
+% setpoint en t=400 y t=800, ruido inyectado desde t=1100)
 t_sim   = 1500;
 N_steps = round(t_sim/Ts);
 t_vec   = (0:N_steps-1)*Ts;
 
 ref = zeros(ny, N_steps);
-k_ch = round(500/Ts);
-ref(:, 1:k_ch)       = repmat([25; 25], 1, k_ch);
-ref(:, k_ch+1:end)   = repmat([30; 20], 1, N_steps - k_ch);
+ref(1,:) = 25;
+ref(2,:) = 25;
+ref(1, t_vec>=400) = 30;     % h3: 25 -> 30 en t=400
+ref(2, t_vec>=800) = 20;     % h4: 25 -> 20 en t=800
 
-% Inicializacion
-h_real = h0;                 % planta NO lineal en variables absolutas
-u_prev = [u10; u20];         % u(k-1) en variables absolutas
+t_ruido = 1100;              % desde t=1100 se inyecta ruido al sensor
+sigma_ruido = 0.3;           % desviacion estandar del ruido (cm)
+
+% Inicializacion (arranca con tanques vacios para mostrar el llenado)
+h_real = [0;0;0;0];
+u_prev = [0; 0];
+
+rng(1);                      % semilla para reproducibilidad del ruido
 
 H_log = zeros(4, N_steps); H_log(:,1) = h_real;
 U_log = zeros(nu, N_steps);
@@ -234,7 +241,13 @@ opts_qp = optimoptions('quadprog','Display','off');
 
 for k = 1:N_steps-1
     % ---- (a) Estado en variables desviadas ------------------------------
-    x_des = h_real - h0;             % desviacion del estado
+    %  La medicion incluye ruido a partir de t = t_ruido.
+    if t_vec(k) >= t_ruido
+        y_med = h_real + [0;0; sigma_ruido*randn; sigma_ruido*randn];
+    else
+        y_med = h_real;
+    end
+    x_des = y_med - h0;              % desviacion del estado medido
     u_prev_des = u_prev - u0;        % desviacion de la entrada anterior
 
     % ---- (b) Respuesta libre F (en desviacion) --------------------------
@@ -341,6 +354,86 @@ subplot(2,1,2)
 plot(t_vec, H_log(2,:), 'b', 'LineWidth', 1.5);
 ylabel('h_2 (cm)'); xlabel('Tiempo (s)');
 title('Tanque 2 (no controlado)'); grid on;
+
+%% ========================================================================
+%  9) VERIFICACION ADICIONAL: GPC sobre modelo LINEAL vs NO LINEAL
+%  ------------------------------------------------------------------------
+%  Repetimos la simulacion del GPC pero, en lugar de avanzar la planta
+%  con ode45 sobre el modelo no lineal, lo hacemos sobre el modelo
+%  LINEAL discreto (Ad, Bd, Cd) en variables desviadas. Comparamos
+%  ambas trayectorias para verificar que el GPC funciona consistente
+%  con su modelo interno, y observar la divergencia que introducen las
+%  no linealidades de la planta real.
+% ========================================================================
+H_log_lin = zeros(4, N_steps); H_log_lin(:,1) = [0;0;0;0];
+U_log_lin = zeros(nu, N_steps);
+
+x_lin = [0;0;0;0] - h0;        % estado lineal en desviacion (arranca de 0)
+u_prev_lin = [0;0];
+rng(1);
+
+for k = 1:N_steps-1
+    if t_vec(k) >= t_ruido
+        x_des = x_lin + [0;0; sigma_ruido*randn; sigma_ruido*randn];
+    else
+        x_des = x_lin;
+    end
+    u_prev_des = u_prev_lin - u0;
+
+    F_vec = zeros(ny*N, 1);
+    x_temp = x_des;
+    for j = 1:N
+        x_temp = Ad*x_temp + Bd*u_prev_des;
+        y_pred = Cd*x_temp;
+        F_vec(j)     = y_pred(1);
+        F_vec(N + j) = y_pred(2);
+    end
+
+    r_des = ref(:,k) - [h30; h40];
+    W = repmat(r_des, N, 1);
+    f_qp = 2*G'*Q*(F_vec - W);
+    u_prev_stack = [repmat(u_prev_lin(1),Nu,1); repmat(u_prev_lin(2),Nu,1)];
+    b_ineq = [ Du_max_vec; -Du_min_vec;
+               u_max_vec - u_prev_stack;
+              -u_min_vec + u_prev_stack ];
+    [DU, ~, ef] = quadprog(H_qp, f_qp, A_ineq_static, b_ineq, ...
+                           [], [], [], [], [], opts_qp);
+    if ef<=0 || isempty(DU), DU = zeros(nu*Nu,1); end
+
+    Du_aplicado = [DU(1); DU(Nu+1)];
+    u_act = u_prev_lin + Du_aplicado;
+    u_act = max(min(u_act, u_max), u_min);
+    U_log_lin(:,k) = u_act;
+
+    % Avance del MODELO LINEAL discreto
+    x_lin = Ad*x_lin + Bd*(u_act - u0);
+    h_lin = x_lin + h0;
+    H_log_lin(:,k+1) = h_lin;
+
+    u_prev_lin = u_act;
+end
+U_log_lin(:,end) = u_prev_lin;
+
+figure('Name','GPC: modelo lineal vs modelo no lineal','NumberTitle','off', ...
+       'Position',[100 100 900 600])
+subplot(2,1,1)
+plot(t_vec, H_log(3,:),     'b',  'LineWidth',1.5); hold on;
+plot(t_vec, H_log_lin(3,:), 'm--','LineWidth',1.4);
+stairs(t_vec, ref(1,:), 'k:', 'LineWidth',1.0);
+ylabel('h_3 (cm)'); xlabel('Tiempo (s)'); grid on;
+legend('GPC sobre planta NO LINEAL','GPC sobre modelo LINEAL','Referencia',...
+       'Location','best');
+title('Verificacion: respuesta de h_3 sobre los dos modelos');
+
+subplot(2,1,2)
+plot(t_vec, H_log(4,:),     'b',  'LineWidth',1.5); hold on;
+plot(t_vec, H_log_lin(4,:), 'm--','LineWidth',1.4);
+stairs(t_vec, ref(2,:), 'k:', 'LineWidth',1.0);
+ylabel('h_4 (cm)'); xlabel('Tiempo (s)'); grid on;
+legend('GPC sobre planta NO LINEAL','GPC sobre modelo LINEAL','Referencia',...
+       'Location','best');
+title('Verificacion: respuesta de h_4 sobre los dos modelos');
+sgtitle('Verificacion del GPC: planta NO lineal vs modelo lineal');
 
 %% ========================================================================
 %  FUNCION DEL MODELO NO LINEAL (planta real)
