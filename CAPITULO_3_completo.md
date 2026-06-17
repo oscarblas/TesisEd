@@ -176,7 +176,7 @@ $$ T_s = \min\left( 0.1 \cdot \tau_{ij} \right) $$
 T_s = \min\left( 0.1 \cdot \tau_{ij} \right)
 ```
 
-donde `τ_{ij}` es la constante de tiempo dominante de cada subproceso `(i, j)` obtenida de la matriz de funciones de transferencia. Para el sistema de cuatro tanques acoplados, las constantes de tiempo `τ_{ij}` calculadas a partir del modelo linealizado se encuentran en el rango de los segundos, lo cual conduce a un valor `T_s = 2 s` adoptado en esta tesis.
+donde `τ_{ij}` es la constante de tiempo dominante de cada subproceso `(i, j)` obtenida de la matriz de funciones de transferencia. Para el sistema de cuatro tanques acoplados, las constantes de tiempo `τ_{ij}` calculadas a partir del modelo linealizado se encuentran en el rango de los 30 segundos. La aplicación estricta de la regla anterior conduce a un valor mínimo de `T_s ≈ 3 s`, pero en la presente investigación se adopta un valor más fino de **`T_s = 1 s`** debido a la naturaleza multivariable acoplada del sistema, donde la dinámica de las interacciones cruzadas entre lazos es más rápida que la respuesta principal. Este criterio coincide con la recomendación de Åström y Wittenmark [pendiente encontrar fuente — Astrom & Wittenmark, Computer-Controlled Systems] de emplear entre 15 y 30 muestras por constante de tiempo dominante en sistemas multivariables o ante ruido de medición, valor que con `T_s = 1 s` corresponde a 30 muestras por `τ_{dom}`.
 
 **Selección del horizonte del modelo.** El horizonte del modelo `N` define cuántos coeficientes de respuesta al escalón conforman cada bloque de la matriz dinámica **G**. Su valor debe ser lo suficientemente grande para que las respuestas al escalón de todos los subprocesos hayan alcanzado prácticamente su valor asintótico, condición necesaria para que el modelo de predicción no trunque información dinámica relevante. La regla práctica adoptada, también de uso común en la literatura del control predictivo [pendiente encontrar fuente — Camacho & Bordons], establece:
 
@@ -196,8 +196,8 @@ evaluado sobre todas las constantes de tiempo del sistema. Sustituyendo los valo
 
 | Parámetro | Símbolo | Valor adoptado | Criterio |
 |---|---|---|---|
-| Tiempo de muestreo | `T_s` | 2 s | `min(0.1 · τ_{ij})` |
-| Horizonte del modelo | `N` | 50 | `max(5·τ_{ij}/T_s + 1)` |
+| Tiempo de muestreo | `T_s` | 1 s | Sobre-muestreo respecto a `min(0.1 · τ_{ij})` por carácter MIMO |
+| Horizonte del modelo | `N` | 50 | `N·T_s` cubre la dinámica completa del sistema |
 
 Conviene enfatizar que estos valores se mantienen **constantes** durante todo el diseño y la sintonización del controlador: en la sección 3.4 únicamente se ajustan los parámetros propiamente de sintonización, a saber, el horizonte de control `N_u` y los pesos `δ` y `λ`. Con `T_s` y `N` ya definidos, el siguiente subapartado aborda la construcción de la matriz dinámica **G**.
 
@@ -483,7 +483,7 @@ Como se estableció en la sección 3.3.2, los parámetros del modelo del control
 
 En la literatura existen cuatro grandes familias de métodos de sintonización para controladores predictivos: (i) reglas **heurístico-analíticas** basadas en la dinámica nominal del proceso, (ii) métodos **analíticos explícitos** derivados a partir de aproximaciones de bajo orden de la planta, (iii) algoritmos **metaheurísticos globales** inspirados en procesos naturales y (iv) métodos de **optimización numérica directa** basados en algoritmos de búsqueda local sin gradiente.
 
-En esta tesis se aplican y comparan **cuatro métodos representativos** —uno por cada familia metodológica— con el objetivo de identificar la sintonización que ofrezca el mejor compromiso entre simplicidad de aplicación, calidad de la respuesta y robustez del controlador. En todos los casos, las reglas o algoritmos propuestos por cada método se aplican **únicamente** sobre `N_u`, `δ` y `λ`, manteniendo `T_s = 2 s` y `N = 50` conforme a la Tabla 3.1.
+En esta tesis se aplican y comparan **cuatro métodos representativos** —uno por cada familia metodológica— con el objetivo de identificar la sintonización que ofrezca el mejor compromiso entre simplicidad de aplicación, calidad de la respuesta y robustez del controlador. En todos los casos, las reglas o algoritmos propuestos por cada método se aplican **únicamente** sobre `N_u`, `δ` y `λ`, manteniendo `T_s = 1 s` y `N = 50` conforme a la Tabla 3.1.
 
 **Tabla 3.A — Métodos de sintonización considerados**
 
@@ -604,7 +604,7 @@ El método de Nelder-Mead [pendiente encontrar fuente — Nelder & Mead 1965], i
 
 ### 3.4.6 Comparación de métodos y selección
 
-Aplicados los cuatro métodos al sistema de cuatro tanques, se ejecuta una simulación de validación común: cambio de referencia de `h₃⁰ = h₄⁰ = 25 cm` a `h₃ = 30 cm`, `h₄ = 20 cm`, simulada sobre el modelo no lineal de la planta. Para cada sintonización se calculan los seis criterios de desempeño y se construye un **score combinado** mediante normalización min-max:
+Aplicados los cuatro métodos al sistema de cuatro tanques, se ejecuta una simulación de validación común sobre el modelo no lineal de la planta: cambio de referencia desde el punto de operación `h₃⁰ = h₄⁰ = 25 cm` hacia `h₃ = 30 cm` y `h₄ = 20 cm`. Este escenario, aunque más simple que el escenario integrado del Capítulo 4, constituye una prueba representativa del seguimiento de referencias en presencia de acoplamiento cruzado, suficiente para discriminar entre métodos de sintonización. Para cada sintonización se calculan los seis criterios de desempeño definidos en la sección 3.2 y se construye un **score combinado** mediante normalización min-max:
 
 **Preview:**
 
@@ -750,4 +750,4 @@ En el presente capítulo se ha desarrollado el diseño completo del controlador 
 
 El diseño se complementó con un análisis riguroso del problema de sintonización, en el cual se aplicaron y compararon cuatro métodos representativos de las cuatro familias metodológicas reconocidas en la literatura: el método heurístico-analítico de Clarke-Mohtadi, el método analítico explícito de Shridhar-Cooper extendido al caso multivariable, el algoritmo metaheurístico global de Optimización por Enjambre de Partículas (PSO) y el método de optimización numérica directa de Nelder-Mead. La comparación se realizó mediante un score combinado que pondera seis criterios de desempeño —sobrepico, tiempo de establecimiento, IAE, ISE, ITAE y esfuerzo de control— lo cual proporciona una evaluación objetiva y reproducible. El método con menor score combinado se adoptó como sintonización final del controlador para las pruebas del Capítulo 4.
 
-Con la estructura matemática y los parámetros del controlador definidos, se cuenta con los elementos necesarios para abordar en el siguiente capítulo las pruebas de simulación bajo distintos escenarios operativos, incluyendo seguimiento de referencias, rechazo de perturbaciones e incertidumbre del modelo, así como el desarrollo de una propuesta de implementación práctica del controlador en un entorno industrial.
+Con la estructura matemática y los parámetros del controlador definidos, se cuenta con los elementos necesarios para abordar en el siguiente capítulo el análisis comparativo entre el GPC desarrollado y un controlador PI descentralizado con desacoplador estático, bajo un escenario integrado que combina arranque del sistema, cambios secuenciales y simultáneos de referencia, inyección de ruido en sensores y operación significativamente alejada del punto de linealización. Adicionalmente, ambos controladores serán implementados en el entorno MATLAB/Simulink para verificar la consistencia de los resultados.
