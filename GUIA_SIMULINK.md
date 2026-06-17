@@ -99,6 +99,8 @@ Abre tu modelo en Simulink y ve a **`Simulation → Model Configuration Paramete
 # PARTE A — Implementación del PI + Desacoplador
 
 > **Mira la imagen `simulink_PID_detallado.png` mientras lees esto.** Los números rojos en la imagen coinciden con los pasos abajo.
+>
+> **Esta versión consolida el desacoplador en UN solo bloque MATLAB Function** (en lugar de los 4 bloques Gain+Sum). Es más limpio visualmente y más coherente con el diseño del GPC.
 
 ### Paso 1 — Step `ref_h4`
 - Biblioteca: `Simulink → Sources → Step`
@@ -140,71 +142,62 @@ Análogo a 1, 2, 3 pero con:
 
 ---
 
-### 🟧 BLOQUE DESACOPLADOR (pasos 7, 8, 9, 10) 🟧
+### Paso 7 — Mux (combina v1 y v2 en un vector)
+- Biblioteca: `Simulink → Signal Routing → Mux`
+- Parámetro: Number of inputs: `2`
+- Entradas: `v1` (del PID 3), `v2` (del PID 6)
+- Salida: vector `v` (2×1) que entra al desacoplador
 
-Esto es el detalle que más cuesta entender. Los 4 bloques actúan así:
+### Paso 8 — 🟧 MATLAB Function `desacoplador` 🟧
+- Biblioteca: `Simulink → User-Defined Functions → MATLAB Function`
+- Doble clic. Pega este código:
 
+```matlab
+function u_pre = desacoplador(v, k12, k21)
+% Desacoplador estatico de Skogestad (simplificado).
+% Entradas:
+%   v   = vector 2x1 con las salidas de los dos PI [v1; v2]
+%   k12 = ganancia cruzada (calculada en init_simulink.m)
+%   k21 = ganancia cruzada (calculada en init_simulink.m)
+% Salida:
+%   u_pre = vector 2x1 con [u1_pre; u2_pre] antes de la saturacion
+
+u1_pre = v(1) - k12 * v(2);
+u2_pre = -k21 * v(1) + v(2);
+u_pre  = [u1_pre; u2_pre];
+end
 ```
-v1 ─────────────────────────► (+) ─────► u1_pre
-                               ▲
-                          (−k12·v2)
-                               │
-v2 ───────► Gain(−k12) ────────┘
 
-v1 ───────► Gain(−k21) ────────┐
-                               │
-                          (−k21·v1)
-                               ▼
-v2 ─────────────────────────► (+) ─────► u2_pre
-```
+**Configuración importante:**
+1. En el editor del MATLAB Function, ve a `Model Explorer` (o `Symbols Pane`)
+2. Selecciona `k12` y `k21` y cambia su **Scope** a **`Parameter`** (no Input). Así toma sus valores del workspace.
+3. Entrada del bloque: `v` (vector 2×1, viene del Mux 7)
+4. Salida del bloque: `u_pre` (vector 2×1)
 
-### Paso 7 — Gain `−k12`
-- Biblioteca: `Simulink → Math Operations → Gain`
-- Parámetro: Gain = `-k12`
-- Entrada: `v2` (sale del PID 6)
-- Salida: va al **Sum 9**
+### Paso 9 — Demux (separa u1_pre y u2_pre)
+- Biblioteca: `Simulink → Signal Routing → Demux`
+- Parámetro: Number of outputs: `2`
+- Entrada: `u_pre` (vector 2×1)
+- Salidas: `u1_pre` (escalar), `u2_pre` (escalar)
 
-### Paso 8 — Gain `−k21`
-- Mismo bloque
-- Parámetro: Gain = `-k21`
-- Entrada: `v1` (sale del PID 3)
-- Salida: va al **Sum 10**
-
-### Paso 9 — Sum (genera `u1_pre`)
-- Tipo: `Sum`, signos: `++`
-- Entradas:
-  - `v1` directo (desde PID 3)
-  - `−k12·v2` (salida del Gain 7)
-- Salida: `u1_pre`
-
-### Paso 10 — Sum (genera `u2_pre`)
-- Tipo: `Sum`, signos: `++`
-- Entradas:
-  - `v2` directo (desde PID 6)
-  - `−k21·v1` (salida del Gain 8)
-- Salida: `u2_pre`
-
----
-
-### Paso 11 — Saturation (límites de u1)
+### Paso 10 — Saturation (límites de u1)
 - Biblioteca: `Simulink → Discontinuities → Saturation`
 - Parámetros:
   - Upper limit: `u_max(1)`
   - Lower limit: `u_min(1)`
 - Entrada: `u1_pre`
-- Salida: `u1` (señal final que va a la bomba 1)
+- Salida: `u1`
 
-### Paso 12 — Saturation (límites de u2)
-- Análogo al 11 pero con `u_max(2)`, `u_min(2)`
+### Paso 11 — Saturation (límites de u2)
+- Análogo al 10 pero con `u_max(2)` y `u_min(2)`
 - Salida: `u2`
 
-### Paso 13 — Mux (combina u1 y u2 en vector)
-- Biblioteca: `Simulink → Signal Routing → Mux`
-- Parámetro: Number of inputs: `2`
+### Paso 12 — Mux (combina u1, u2 en vector u)
+- Number of inputs: `2`
 - Entradas: `u1`, `u2`
-- Salida: vector `u` de dimensión 2×1
+- Salida: vector `u` (2×1) que va a la planta
 
-### Paso 14 — MATLAB Function (planta no lineal)
+### Paso 13 — MATLAB Function (planta no lineal)
 - Biblioteca: `Simulink → User-Defined Functions → MATLAB Function`
 - Doble clic. Pega este código:
 
@@ -230,7 +223,7 @@ h_next=h;
 - Entradas: `u` (vector 2×1 del Mux), `h_prev` (vector 4×1 del Unit Delay), `Ts` (escalar)
 - Salida: `h_next` (vector 4×1)
 
-### Paso 15 — Unit Delay (memoria del estado)
+### Paso 14 — Unit Delay (memoria del estado)
 - Biblioteca: `Simulink → Discrete → Unit Delay`
 - Parámetros:
   - Initial condition: `h0` (vector 4×1)
@@ -238,20 +231,20 @@ h_next=h;
 - Entrada: `h_next` (de la planta)
 - Salida: `h_prev` (vuelve a la planta como entrada y se ramifica a los Selectores)
 
-### Pasos 16 y 17 — Selectores para extraer h₃ y h₄
+### Pasos 15 y 16 — Selectores para extraer h₃ y h₄
 - Biblioteca: `Simulink → Signal Routing → Selector`
-- Parámetros del Selector h₃ (paso 16):
+- Parámetros del Selector h₃ (paso 15):
   - Number of input dimensions: `1`
   - Index Option: `Index vector (dialog)`
   - Index: `3`
-- Parámetros del Selector h₄ (paso 17):
+- Parámetros del Selector h₄ (paso 16):
   - Index: `4`
 - Entradas: vector `h` del Unit Delay
 - Salidas: `h3` → al Sum 5 (entrada −) | `h4` → al Sum 2 (entrada −)
 
-### Paso 18 — Scope
+### Paso 17 — Scope
 - Biblioteca: `Simulink → Sinks → Scope`
-- Conecta: salidas de los Selectores 16 y 17
+- Conecta: salidas de los Selectores 15 y 16
 
 ---
 
