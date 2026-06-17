@@ -223,13 +223,15 @@ h_next=h;
 - Entradas: `u` (vector 2×1 del Mux), `h_prev` (vector 4×1 del Unit Delay), `Ts` (escalar)
 - Salida: `h_next` (vector 4×1)
 
-### Paso 14 — Unit Delay (memoria del estado)
+### Paso 14 — Unit Delay (memoria del estado) ⚠ IMPORTANTE
 - Biblioteca: `Simulink → Discrete → Unit Delay`
 - Parámetros:
-  - Initial condition: `h0` (vector 4×1)
+  - **Initial condition: `zeros(4,1)`** ← arranca con tanques vacíos (Opción A)
   - Sample time: `Ts`
 - Entrada: `h_next` (de la planta)
 - Salida: `h_prev` (vuelve a la planta como entrada y se ramifica a los Selectores)
+
+> **¿Por qué `zeros(4,1)` y no `h0`?** Es para evitar la pequeña bajada inicial. Si pones `h0`, la planta arranca llena al estacionario pero los PI están con integradores en 0, así que las bombas están apagadas y los tanques pierden agua hasta que los PI reaccionen. Con `zeros(4,1)` arranca todo en cero (igual que `controlador_PID.m`) y el sistema se llena suavemente hasta el estacionario antes de t=400 s.
 
 ### Pasos 15 y 16 — Selectores para extraer h₃ y h₄
 - Biblioteca: `Simulink → Signal Routing → Selector`
@@ -250,17 +252,86 @@ h_next=h;
 
 # PARTE B — Implementación del GPC
 
-> **Mira la imagen `simulink_GPC_detallado.png` mientras lees esto.**
+> **Mira la imagen `simulink_GPC_detallado.png` mientras lees esto.** Los puertos azules son ENTRADAS y los puertos rojos son SALIDAS de cada bloque.
 
 El GPC es **más simple visualmente** que el PID porque toda la complejidad vive dentro de UN solo bloque MATLAB Function (`gpc_step`).
 
-### Paso 1 y 2 — Steps de referencia
-- Igual que los Step del PID:
-  - Step 1: `ref_h3` (25→30 en t=400)
-  - Step 2: `ref_h4` (25→20 en t=800)
+---
 
-### Paso 3 — Mux (combina referencias)
+## Resumen visual de qué entra y qué sale de cada bloque
+
+### Bloque 4 — `gpc_step` (MATLAB Function)
+```
+                          ┌─────────────────────────┐
+y_med  (4×1) ────────────►│                         │
+                          │      gpc_step           │
+r_act  (2×1) ────────────►│                         ├────► u_new (2×1)
+                          │  (resuelve QP adentro)  │
+u_prev (2×1) ────────────►│                         │
+                          └─────────────────────────┘
+```
+
+| Puerto | Dirección | Nombre | Tamaño | De dónde viene / a dónde va |
+|---|---|---|---|---|
+| 1 | Entrada | `y_med` | 4×1 | Salida del **Unit Delay 1** (estado medido) |
+| 2 | Entrada | `r_act` | 2×1 | Salida del **Mux** de referencias |
+| 3 | Entrada | `u_prev` | 2×1 | Salida del **Unit Delay 2** (entrada anterior) |
+| 4 | Salida | `u_new` | 2×1 | Va a la **Saturation** |
+
+### Bloque 7 — `planta_no_lineal` (MATLAB Function)
+```
+                          ┌─────────────────────────┐
+u      (2×1) ────────────►│                         │
+                          │     planta_no_lineal    │
+h_prev (4×1) ────────────►│                         ├────► h_next (4×1)
+                          │  (integra modelo no     │
+Ts     (1×1) ────────────►│   lineal con ode4)      │
+                          └─────────────────────────┘
+```
+
+| Puerto | Dirección | Nombre | Tamaño | De dónde viene / a dónde va |
+|---|---|---|---|---|
+| 1 | Entrada | `u` | 2×1 | Salida de la **Saturation** |
+| 2 | Entrada | `h_prev` | 4×1 | Salida del **Unit Delay 1** (mismo que va al GPC) |
+| 3 | Entrada | `Ts` | 1×1 | Bloque **Constant** con valor `Ts` |
+| 4 | Salida | `h_next` | 4×1 | Va al **Unit Delay 1** |
+
+### Bloque 8 — Unit Delay 1 (para el estado h)
+```
+h_next (4×1) ──►│ Unit Delay 1 │──► h_prev (4×1) ─────┬─► entra al GPC como y_med
+                │ IC=zeros(4,1)│                       └─► entra a la planta como h_prev
+```
+
+| Dirección | Nombre | Tamaño |
+|---|---|---|
+| Entrada | `h_next` (de la planta) | 4×1 |
+| Salida | se llama `h_prev` cuando va a la planta, `y_med` cuando va al GPC | 4×1 |
+
+**Es la MISMA señal con dos nombres distintos según a dónde vaya.**
+
+### Bloque 9 — Unit Delay 2 (para la entrada u)
+```
+u (2×1, saturada) ──►│ Unit Delay 2 │──► u_prev (2×1) ──► entra al GPC como u_prev
+                     │ IC=zeros(2,1)│
+```
+
+| Dirección | Nombre | Tamaño |
+|---|---|---|
+| Entrada | `u` saturada (de la Saturation) | 2×1 |
+| Salida | `u_prev` | 2×1 |
+
+---
+
+## Pasos en orden de armado
+
+### Pasos 1 y 2 — Steps de referencia
+- Step 1 (`ref_h3`): Initial = 25, Final = 30, Step time = 400
+- Step 2 (`ref_h4`): Initial = 25, Final = 20, Step time = 800
+
+### Paso 3 — Mux para `r_act`
+- Biblioteca: `Simulink → Signal Routing → Mux`
 - Number of inputs: `2`
+- Entradas: salidas de Step 1 y Step 2
 - Salida: `r_act` (vector 2×1)
 
 ### Paso 4 — MATLAB Function `gpc_step`
@@ -314,27 +385,48 @@ u_new = max(min(u_new, u_max), u_min);
 end
 ```
 
-**Importante: las matrices (Ad, Bd, Cd, G_din, Q, H_qp, A_ineq, h0, u0, etc.) son parámetros del bloque, no entradas.** Para configurarlos:
-1. En el editor del MATLAB Function, ve a `Model Explorer`
-2. Selecciona cada variable y cambia su Scope a **`Parameter`**
-3. Marca **Tunable: false**
+**Configuración de los parámetros del bloque:**
+
+Las variables `Ad, Bd, Cd, G_din, Q, H_qp, A_ineq, h0, u0, h30, h40, N, Nu, Du_max, Du_min, u_max, u_min` aparecen como argumentos de la función pero NO son entradas (no se cablean): son **parámetros que se leen del workspace**.
+
+Para configurarlos:
+1. En el editor del bloque MATLAB Function, abre el **Symbols Pane** (Vista lateral)
+2. Para cada variable, cambia el **Scope** de `Input` a **`Parameter`**
+3. Después de eso, **solo quedarán 3 entradas cableables**: `y_med`, `u_prev`, `r_act`
 
 ### Paso 5 — Saturation
-- Igual que en el PID (límites `u_min`, `u_max` ya están dentro del `gpc_step`, este Saturation es una protección adicional)
+- Biblioteca: `Simulink → Discontinuities → Saturation`
+- Upper limit: `u_max`
+- Lower limit: `u_min`
+- Entrada: `u_new` (del `gpc_step`)
+- Salida: `u` (vector 2×1, saturada) → va a la **planta**
 
-### Paso 6 — MATLAB Function `planta_no_lineal`
-- **Es el mismo bloque** que el del PID (Paso 14 de la Parte A). Puedes copiar/pegar.
+### Paso 6 — Constant `Ts`
+- Biblioteca: `Simulink → Sources → Constant`
+- Value: `Ts`
+- Salida: va al puerto `Ts` de la **planta**
 
-### Paso 7 — Unit Delay (memoria del estado h)
-- Initial condition: `h0`
-- Salida: `y_med` (vector 4×1) que vuelve a `gpc_step`
+### Paso 7 — MATLAB Function `planta_no_lineal`
+- **Es el mismo bloque** que el del PID (paso 13 de la Parte A). Puedes copiar/pegar.
 
-### Paso 8 — Unit Delay (memoria de u_prev)
-- Initial condition: `u0`
-- Salida: `u_prev` (vector 2×1) que vuelve a `gpc_step`
+### Paso 8 — Unit Delay 1 (para el estado h) ⚠ IMPORTANTE
+- Biblioteca: `Simulink → Discrete → Unit Delay`
+- **Initial condition: `zeros(4,1)`** ← arranca con tanques vacíos (Opción A)
+- Sample time: `Ts`
+- Entrada: `h_next` (de la planta)
+- Salida: se cablea a **dos sitios**:
+  - Al puerto `h_prev` del bloque `planta_no_lineal`
+  - Al puerto `y_med` del bloque `gpc_step`
 
-### Paso 9 — Scope
-- Conecta a `h3` y `h4` (puedes extraer con Selectores como en el PID)
+### Paso 9 — Unit Delay 2 (para la entrada u) ⚠ IMPORTANTE
+- Initial condition: **`zeros(2,1)`** ← bombas apagadas al inicio
+- Sample time: `Ts`
+- Entrada: `u` saturada (de la Saturation, paso 5)
+- Salida: cableada al puerto `u_prev` del bloque `gpc_step`
+
+### Paso 10 — Scope
+- Conecta a la salida del **Unit Delay 1** para visualizar `h3, h4`.
+- Si quieres ver solo `h3` y `h4` y no las 4 alturas, usa Selectores con `Index=3` y `Index=4` como en el PID.
 
 ---
 
