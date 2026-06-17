@@ -113,7 +113,7 @@ fprintf('      [ %+.4f   1 ]\n\n', -k21);
 %  ------------------------------------------------------------------------
 %  Escenario que evidencia el efecto del acoplamiento + ruido.
 % ========================================================================
-Ts = 2;
+Ts = 1;
 t_sim = 1500;
 N_steps = round(t_sim/Ts);
 t_vec = (0:N_steps-1)*Ts;
@@ -192,20 +192,45 @@ U_log(:,end) = u_actual;
 
 %% ========================================================================
 %  6) METRICAS DE DESEMPENO
+%  ------------------------------------------------------------------------
+%  Se reportan dos conjuntos de metricas:
+%   (a) Globales: sobre toda la simulacion (incluye el arranque desde h=0)
+%   (b) Operacion normal: SOLO desde t = 400 s en adelante. Este es el
+%       conjunto relevante para evaluar el desempeno del controlador en
+%       regimen operativo, una vez alcanzado el punto estacionario.
 % ========================================================================
 e_h3 = ref(1,:) - H_log(3,:);
 e_h4 = ref(2,:) - H_log(4,:);
 
-IAE  = sum(abs(e_h3) + abs(e_h4))*Ts;
-ISE  = sum(e_h3.^2 + e_h4.^2)*Ts;
-ITAE = sum((abs(e_h3) + abs(e_h4)).*t_vec)*Ts;
+% Metricas globales
+IAE   = sum(abs(e_h3) + abs(e_h4))*Ts;
+ISE   = sum(e_h3.^2 + e_h4.^2)*Ts;
+ITAE  = sum((abs(e_h3) + abs(e_h4)).*t_vec)*Ts;
 esfuerzo = sum(sum(abs(diff(U_log,1,2))));
 
-fprintf('=== Desempeno PI descentralizado + DESACOPLADOR ===\n');
-fprintf('  IAE      = %.2f\n', IAE);
-fprintf('  ISE      = %.2f\n', ISE);
-fprintf('  ITAE     = %.2f\n', ITAE);
-fprintf('  Esfuerzo = %.2f\n\n', esfuerzo);
+% Metricas en operacion normal (t >= 400 s)
+t_eval = 400;
+k_eval = find(t_vec >= t_eval, 1, 'first');
+IAE_op  = sum(abs(e_h3(k_eval:end)) + abs(e_h4(k_eval:end)))*Ts;
+ISE_op  = sum(e_h3(k_eval:end).^2 + e_h4(k_eval:end).^2)*Ts;
+ITAE_op = sum((abs(e_h3(k_eval:end)) + abs(e_h4(k_eval:end))) ...
+              .*(t_vec(k_eval:end) - t_eval))*Ts;
+esfuerzo_op = sum(sum(abs(diff(U_log(:,k_eval:end),1,2))));
+
+% Metrica de acoplamiento INT_ij (Cap 4.4.2)
+% Ventana DT despues del cambio de SP en t=400 (cambio de h3)
+DT = 300;  delta_r3 = 5;  delta_r4 = 5;
+idx_win = (t_vec >= 400) & (t_vec <= 400 + DT);
+INT_h4_pid = sum(abs(e_h4(idx_win)))*Ts / delta_r3;  % perturbacion en h4 por cambio de r3
+
+fprintf('=== Desempeno PI + DESACOPLADOR ===\n');
+fprintf('  --- Globales (todo el tiempo) ---\n');
+fprintf('  IAE      = %.2f    ISE  = %.2f    ITAE = %.2f\n', IAE, ISE, ITAE);
+fprintf('  Esfuerzo = %.2f\n', esfuerzo);
+fprintf('  --- Operacion normal (t >= %d s) ---\n', t_eval);
+fprintf('  IAE_op   = %.2f    ISE_op  = %.2f    ITAE_op = %.2f\n', IAE_op, ISE_op, ITAE_op);
+fprintf('  Esfuerzo_op = %.2f\n', esfuerzo_op);
+fprintf('  INT (acople h4 por r3) = %.2f\n\n', INT_h4_pid);
 
 %% ========================================================================
 %  7) GRAFICAS
@@ -245,6 +270,7 @@ sgtitle('PI descentralizado + DESACOPLADOR sobre planta no lineal');
 %% Guardar resultados para comparacion con GPC
 save('resultados_PID.mat','t_vec','H_log','U_log','ref', ...
      'IAE','ISE','ITAE','esfuerzo', ...
+     'IAE_op','ISE_op','ITAE_op','esfuerzo_op','INT_h4_pid','t_eval', ...
      'Kp1','Ti1','Kp2','Ti2','D','t_ruido','sigma_ruido');
 fprintf('Resultados guardados en resultados_PID.mat\n');
 

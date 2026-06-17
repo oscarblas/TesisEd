@@ -68,7 +68,7 @@ Cc = [0 0 1 0;
 Dc = zeros(2,2);
 
 % Discretizacion con ZOH (parametro de sintonizacion)
-Ts = 2;
+Ts = 1;
 sys_c = ss(Ac, Bc, Cc, Dc);
 sys_d = c2d(sys_c, Ts, 'zoh');
 
@@ -88,7 +88,7 @@ nu = 2;   % numero de entradas (u1, u2)
 %  cada subproceso.
 % ========================================================================
 N  = 50;   % horizonte de prediccion (N2 con N1 = 1, d = 0)
-Nu = 9;    % horizonte de control
+Nu = 5;    % horizonte de control (reducido para mejorar acoplamiento)
 
 G_z = tf(sys_d);   % matriz de funciones de transferencia discretas
 

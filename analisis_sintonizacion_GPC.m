@@ -89,8 +89,8 @@ metodos = {};
 %  dinamica de la planta. Se mantienen CONSTANTES para todos los metodos
 %  de sintonizacion. La sintonizacion solo determina Nu, delta y lambda.
 % ------------------------------------------------------------------------
-Ts_fijo = 2;        % de la seccion 3.3.2: Ts = min(0.1 * tau_ij)
-N_fijo  = 50;       % de la seccion 3.3.2: N  = max(5 * tau_ij / Ts + 1)
+Ts_fijo = 1;        % de la seccion 3.3.2 (ajustado para mejorar acoplamiento)
+N_fijo  = 50;       % de la seccion 3.3.2
 
 % --- Metodo 1: Clarke-Mohtadi (1987) ----------------------------------
 % Sintoniza solo Nu, delta y lambda (Ts y N se toman de 3.3.2).

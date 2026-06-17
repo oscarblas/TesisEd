@@ -64,9 +64,9 @@ P.T1=T1; P.T2=T2; P.T3=T3; P.T4=T4;
 %% ========================================================================
 %  CONTROLADOR GPC: parametros (ganadores del analisis de sintonizacion)
 % ========================================================================
-GPC.Ts     = 2;
+GPC.Ts     = 1;
 GPC.N      = 50;
-GPC.Nu     = 9;
+GPC.Nu     = 5;
 GPC.delta  = [10 10];
 GPC.lambda = [0.0076803 0.0076803];
 GPC.Du_max = [100; 100];
@@ -74,7 +74,7 @@ GPC.Du_max = [100; 100];
 %% ========================================================================
 %  CONTROLADOR PID: sintonizacion IMC (seccion 4.2.2)
 % ========================================================================
-PID.Ts = 2;
+PID.Ts = 1;
 PID.K1   = y1*k1*T4/A4;
 PID.tau1 = T4;
 PID.lam1 = PID.tau1/3;
@@ -226,18 +226,37 @@ fprintf('    GPC = %.2f      PID = %.2f      Razon PID/GPC = %.2f\n', ...
 
 %% ========================================================================
 %  TABLA RESUMEN FINAL DE METRICAS (Tabla 4.2)
+%  --- GLOBALES (incluyen el arranque desde h = 0) ---
 % ========================================================================
 fprintf('\n========================================================\n');
-fprintf('  TABLA 4.2: RESUMEN DE METRICAS POR ESCENARIO\n');
+fprintf('  TABLA 4.2.A: METRICAS GLOBALES POR ESCENARIO\n');
 fprintf('========================================================\n');
-fprintf('%-30s %10s %10s %10s %10s %10s %10s\n', ...
+fprintf('%-15s %10s %10s %10s %10s %10s %10s\n', ...
         'Escenario', 'IAE_GPC', 'IAE_PID', 't_GPC', 't_PID', 'M_p_GPC', 'M_p_PID');
 for s = 1:6
-    fprintf('%-30s %10.2f %10.2f %10.1f %10.1f %10.2f %10.2f\n', ...
+    fprintf('%-15s %10.2f %10.2f %10.1f %10.1f %10.2f %10.2f\n', ...
             sprintf('Esc. %d', s), ...
             resultados(s).m_gpc.IAE, resultados(s).m_pid.IAE, ...
             resultados(s).m_gpc.t_est, resultados(s).m_pid.t_est, ...
             resultados(s).m_gpc.M_p,   resultados(s).m_pid.M_p);
+end
+
+%% ========================================================================
+%  TABLA RESUMEN FINAL DE METRICAS (Tabla 4.2)
+%  --- OPERACION NORMAL (t >= 400 s, EXCLUYE el arranque) ---
+%  Esta es la tabla relevante para evaluar el desempeno del controlador
+%  en regimen operativo, donde se aprecian los efectos de acoplamiento.
+% ========================================================================
+fprintf('\n========================================================\n');
+fprintf('  TABLA 4.2.B: METRICAS EN OPERACION NORMAL (t >= 400 s)\n');
+fprintf('========================================================\n');
+fprintf('%-15s %12s %12s %12s %12s\n', ...
+        'Escenario', 'IAE_op_GPC', 'IAE_op_PID', 'ISE_op_GPC', 'ISE_op_PID');
+for s = 1:6
+    fprintf('%-15s %12.2f %12.2f %12.2f %12.2f\n', ...
+            sprintf('Esc. %d', s), ...
+            resultados(s).m_gpc.IAE_op, resultados(s).m_pid.IAE_op, ...
+            resultados(s).m_gpc.ISE_op, resultados(s).m_pid.ISE_op);
 end
 
 %% ========================================================================
@@ -473,9 +492,24 @@ function m = calcular_metricas(t, H, U, esc, t_exec)
     e3 = ref(1,:) - H(3,:);
     e4 = ref(2,:) - H(4,:);
 
+    % Metricas globales (toda la simulacion)
     m.IAE  = sum(abs(e3) + abs(e4))*Ts;
     m.ISE  = sum(e3.^2 + e4.^2)*Ts;
     m.ITAE = sum((abs(e3) + abs(e4)).*t)*Ts;
+
+    % Metricas en operacion normal (a partir de t = 400 s)
+    t_eval = 400;
+    k_ev = find(t >= t_eval, 1, 'first');
+    if ~isempty(k_ev)
+        m.IAE_op  = sum(abs(e3(k_ev:end)) + abs(e4(k_ev:end)))*Ts;
+        m.ISE_op  = sum(e3(k_ev:end).^2 + e4(k_ev:end).^2)*Ts;
+        m.ITAE_op = sum((abs(e3(k_ev:end)) + abs(e4(k_ev:end))) ...
+                        .*(t(k_ev:end) - t_eval))*Ts;
+        m.esfuerzo_op = sum(sum(abs(diff(U(:,k_ev:end),1,2))));
+    else
+        m.IAE_op = m.IAE; m.ISE_op = m.ISE; m.ITAE_op = m.ITAE;
+        m.esfuerzo_op = sum(sum(abs(diff(U,1,2))));
+    end
 
     % Detectar instante del cambio de referencia
     dref = sum(abs(diff(ref,1,2)),1);

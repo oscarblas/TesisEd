@@ -51,7 +51,7 @@ params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
 %% ========================================================================
 %  2) ESCENARIO COMUN
 % ========================================================================
-Ts = 2;
+Ts = 1;
 t_sim = 1500; N_steps = round(t_sim/Ts);
 t_vec = (0:N_steps-1)*Ts;
 
@@ -113,7 +113,7 @@ fprintf('PI + desacoplador OK\n');
 %% ========================================================================
 %  4) SIMULACION DEL GPC
 % ========================================================================
-N = 50; Nu = 9;
+N = 50; Nu = 5;
 delta  = [10 10];
 lambda = [0.0076803 0.0076803];
 
@@ -200,11 +200,22 @@ U_gpc(:,end) = u_prev;
 fprintf('GPC OK\n\n');
 
 %% ========================================================================
-%  5) METRICAS COMPARATIVAS
+%  5) METRICAS COMPARATIVAS (Opcion 3: globales + operacion normal + INT)
+%  ------------------------------------------------------------------------
+%  Las metricas IAE, ISE, ITAE y esfuerzo se reportan en dos ventanas:
+%    (a) GLOBAL:   toda la simulacion (incluye arranque desde h=0)
+%    (b) OP. NORMAL: solo desde t = 400 s (excluye llenado inicial)
+%
+%  Adicionalmente se calcula la METRICA DE ACOPLAMIENTO INT_ij que
+%  cuantifica cuanto se desvia una salida cuando solo cambia el SP de
+%  la otra:
+%     INT_h4 = integral del error en h4 durante [400, 400+DT]/|Dr3|
+%     INT_h3 = integral del error en h3 durante [800, 800+DT]/|Dr4|
 % ========================================================================
 e3_gpc = ref(1,:)-H_gpc(3,:); e4_gpc = ref(2,:)-H_gpc(4,:);
 e3_pid = ref(1,:)-H_pid(3,:); e4_pid = ref(2,:)-H_pid(4,:);
 
+% --- Globales ---
 GPC.IAE = sum(abs(e3_gpc)+abs(e4_gpc))*Ts;
 GPC.ISE = sum(e3_gpc.^2 + e4_gpc.^2)*Ts;
 GPC.esf = sum(sum(abs(diff(U_gpc,1,2))));
@@ -212,14 +223,42 @@ PID.IAE = sum(abs(e3_pid)+abs(e4_pid))*Ts;
 PID.ISE = sum(e3_pid.^2 + e4_pid.^2)*Ts;
 PID.esf = sum(sum(abs(diff(U_pid,1,2))));
 
+% --- Operacion normal (t >= 400) ---
+t_eval = 400;
+k_eval = find(t_vec >= t_eval, 1, 'first');
+GPC.IAEop = sum(abs(e3_gpc(k_eval:end))+abs(e4_gpc(k_eval:end)))*Ts;
+GPC.ISEop = sum(e3_gpc(k_eval:end).^2 + e4_gpc(k_eval:end).^2)*Ts;
+GPC.esfop = sum(sum(abs(diff(U_gpc(:,k_eval:end),1,2))));
+PID.IAEop = sum(abs(e3_pid(k_eval:end))+abs(e4_pid(k_eval:end)))*Ts;
+PID.ISEop = sum(e3_pid(k_eval:end).^2 + e4_pid(k_eval:end).^2)*Ts;
+PID.esfop = sum(sum(abs(diff(U_pid(:,k_eval:end),1,2))));
+
+% --- Metrica de acoplamiento INT ---
+DT = 300;  delta_r3 = 5;  delta_r4 = 5;
+win_r3 = (t_vec >= 400) & (t_vec <= 400+DT);
+win_r4 = (t_vec >= 800) & (t_vec <= 800+DT);
+GPC.INT_h4 = sum(abs(e4_gpc(win_r3)))*Ts / delta_r3;
+GPC.INT_h3 = sum(abs(e3_gpc(win_r4)))*Ts / delta_r4;
+PID.INT_h4 = sum(abs(e4_pid(win_r3)))*Ts / delta_r3;
+PID.INT_h3 = sum(abs(e3_pid(win_r4)))*Ts / delta_r4;
+
 fprintf('=========================================================\n');
 fprintf('       COMPARACION GPC vs PI + DESACOPLADOR\n');
 fprintf('=========================================================\n');
+fprintf('  --- METRICAS GLOBALES (incluye arranque) ---\n');
 fprintf('  Metrica       GPC          PI+Desacopl   Ganador\n');
-fprintf('---------------------------------------------------------\n');
 fprintf('  IAE       %10.2f   %10.2f      %s\n', GPC.IAE, PID.IAE, gan(GPC.IAE,PID.IAE));
 fprintf('  ISE       %10.2f   %10.2f      %s\n', GPC.ISE, PID.ISE, gan(GPC.ISE,PID.ISE));
 fprintf('  Esfuerzo  %10.2f   %10.2f      %s\n', GPC.esf, PID.esf, gan(GPC.esf,PID.esf));
+fprintf('  --- METRICAS OPERACION NORMAL (t >= %d s) ---\n', t_eval);
+fprintf('  IAE_op    %10.2f   %10.2f      %s\n', GPC.IAEop, PID.IAEop, gan(GPC.IAEop,PID.IAEop));
+fprintf('  ISE_op    %10.2f   %10.2f      %s\n', GPC.ISEop, PID.ISEop, gan(GPC.ISEop,PID.ISEop));
+fprintf('  Esf_op    %10.2f   %10.2f      %s\n', GPC.esfop, PID.esfop, gan(GPC.esfop,PID.esfop));
+fprintf('  --- METRICAS DE ACOPLAMIENTO INT ---\n');
+fprintf('  INT(h4)   %10.2f   %10.2f      %s   (acople en h4 por cambio de r3)\n', ...
+        GPC.INT_h4, PID.INT_h4, gan(GPC.INT_h4, PID.INT_h4));
+fprintf('  INT(h3)   %10.2f   %10.2f      %s   (acople en h3 por cambio de r4)\n', ...
+        GPC.INT_h3, PID.INT_h3, gan(GPC.INT_h3, PID.INT_h3));
 fprintf('=========================================================\n\n');
 
 %% ========================================================================
