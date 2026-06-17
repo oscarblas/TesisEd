@@ -1,0 +1,33 @@
+Mensaje 1
+Simulink does not have enough information to determine output sizes for this block. If you think the errors below are inaccurate, try specifying types for the block inputs and/or sizes for the block outputs.
+
+Component: MATLAB Function | Category: Coder error
+
+Mensaje 2
+QUADPROG requires 10 input arguments. Pass OPTIMOPTIONS to the solver with property 'Algorithm' set to 'active-set'.  
+
+Function 'MATLAB Function2' (#240.1044.1080), line 38, column 6:
+"quadprog(H_qp, f_qp, A_ineq, b_ineq)"
+Launch diagnostic report.  
+
+Component: MATLAB Function | Category: Coder error
+
+Mensaje 3
+Errors occurred during parsing of 'comparativa_GPC_PID/MATLAB Function2'.
+
+Component: MATLAB Function | Category: Coder error
+
+Mensaje 4
+Simulink unable to determine sizes and/or types of the outputs for block 'comparativa_GPC_PID/MATLAB Function2' due to errors in the block body, or limitations of the underlying analysis. The errors might be inaccurate. Fix the indicated errors, or explicitly specify sizes and/or types for all block outputs.
+
+Component: MATLAB Function | Category: Coder error
+
+Mensaje 5
+Simulink unable to determine sizes and/or types of the outputs for block 'comparativa_GPC_PID/MATLAB Function2' due to errors in the block body, or limitations of the underlying analysis. The errors might be inaccurate. Fix the indicated errors, or explicitly specify sizes and/or types for all block outputs.
+
+Component: Simulink | Category: Model error
+
+Mensaje 6
+Error in port widths or dimensions. 'Output Port 1' of 'comparativa_GPC_PID/MATLAB Function2/y_med' has 4 elements. This port does not accept the dimensions (or orientation) specified by the output signal.
+
+Component: Simulink | Category: Model error
