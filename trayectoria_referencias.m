@@ -1,8 +1,11 @@
 %% ========================================================================
 %  trayectoria_referencias.m
 %  Genera la IMAGEN 4.2 del Capitulo 4: trayectoria de referencias
-%  r_h3(t) y r_h4(t) durante toda la simulacion del escenario integrado,
-%  con lineas verticales que marcan los cinco eventos.
+%  r_h3(t) y r_h4(t) durante toda la simulacion del escenario integrado.
+%
+%  Formato: subplot vertical de dos paneles (uno por cada trayectoria),
+%  con ejes equivalentes a los usados en controlador_PID.m / controlador_GPC.m
+%  pero mostrando unicamente la trayectoria de referencia.
 %
 %  Eventos del escenario (Seccion 4.3.2):
 %    t = 0    s  Arranque desde tanques vacios
@@ -30,48 +33,39 @@ ref_h4(t >= 800)  = 20;     % cambio h4: 25 -> 20
 ref_h3(t >= 1200) = 25;     % h3 regresa a 25
 ref_h4(t >= 1200) = 35;     % h4 sube a 35 (lejos del punto de linealizacion)
 
+t_ruido = 1100;
+
 %% ========================================================================
 %  2) GRAFICA  (IMAGEN 4.2)
 % ========================================================================
 fig = figure('Name','IMAGEN 4.2 - Trayectoria de referencias', ...
-             'NumberTitle','off','Position',[80 80 1100 520]);
-hold on;
+             'NumberTitle','off','Position',[80 80 950 700]);
 
-% --- Trayectorias de referencia ----------------------------------------
-stairs(t, ref_h3, 'LineWidth', 2.0, 'Color', [0.00 0.45 0.74]);
-stairs(t, ref_h4, 'LineWidth', 2.0, 'Color', [0.85 0.33 0.10]);
+% --- Subplot 1: trayectoria de referencia para h3 -----------------------
+subplot(2,1,1)
+stairs(t, ref_h3, 'r--', 'LineWidth', 1.5); hold on;
+xline(400, 'k:', 'SP h_3', 'LabelHorizontalAlignment','center');
+xline(800, 'k:', 'SP h_4');
+xline(t_ruido, 'm:', 'RUIDO');
+xline(1200, 'k:', 'SP h_3 y h_4', 'LabelHorizontalAlignment','center');
+ylabel('h_3 (cm)'); xlabel('Tiempo (s)'); grid on;
+legend('Referencia','Location','best');
+title('Trayectoria de referencia del tanque 3');
+ylim([0 40]); xlim([0 t_sim]);
 
-% --- Lineas verticales de los eventos -----------------------------------
-eventos = [   0,  'Arranque  (h = 0)';
-            400,  'SP h_3: 25 -> 30 cm';
-            800,  'SP h_4: 25 -> 20 cm';
-           1100,  'Ruido gaussiano  (\sigma = 0.3 cm)';
-           1200,  'SP h_3 -> 25  y  SP h_4 -> 35 cm'];
+% --- Subplot 2: trayectoria de referencia para h4 -----------------------
+subplot(2,1,2)
+stairs(t, ref_h4, 'r--', 'LineWidth', 1.5); hold on;
+xline(400, 'k:', 'SP h_3', 'LabelHorizontalAlignment','center');
+xline(800, 'k:', 'SP h_4');
+xline(t_ruido, 'm:', 'RUIDO');
+xline(1200, 'k:', 'SP h_3 y h_4', 'LabelHorizontalAlignment','center');
+ylabel('h_4 (cm)'); xlabel('Tiempo (s)'); grid on;
+legend('Referencia','Location','best');
+title('Trayectoria de referencia del tanque 4');
+ylim([0 40]); xlim([0 t_sim]);
 
-t_eventos = [0 400 800 1100 1200];
-etiq_eventos = {'Arranque  (h = 0)', ...
-                'SP h_3: 25 \rightarrow 30 cm', ...
-                'SP h_4: 25 \rightarrow 20 cm', ...
-                'Ruido gaussiano (\sigma = 0.3 cm)', ...
-                'SP h_3 \rightarrow 25  y  SP h_4 \rightarrow 35 cm'};
-
-for k = 1:length(t_eventos)
-    xline(t_eventos(k), 'k:', etiq_eventos{k}, ...
-          'LineWidth', 1.1, ...
-          'LabelOrientation', 'horizontal', ...
-          'LabelVerticalAlignment', 'top', ...
-          'FontSize', 9);
-end
-
-% --- Formato ------------------------------------------------------------
-xlabel('Tiempo (s)', 'FontWeight', 'bold');
-ylabel('Referencia (cm)', 'FontWeight', 'bold');
-title('Trayectoria de referencias del escenario integrado de simulacion');
-legend({'r_{h_3}(t)','r_{h_4}(t)'}, 'Location','northwest','FontSize',11);
-ylim([0 40]);
-xlim([0 t_sim]);
-grid on; box on;
-set(gca,'FontSize',11);
+sgtitle('Trayectoria de referencias del escenario integrado de simulacion');
 
 % Guardar como PNG con buena resolucion para la tesis
 exportgraphics(fig, 'IMAGEN_4_2_trayectoria_referencias.png', 'Resolution', 200);
