@@ -52,13 +52,15 @@ params = struct('A1',A1,'A2',A2,'A3',A3,'A4',A4, ...
 %  2) ESCENARIO COMUN
 % ========================================================================
 Ts = 1;
-t_sim = 1500; N_steps = round(t_sim/Ts);
+t_sim = 2000; N_steps = round(t_sim/Ts);
 t_vec = (0:N_steps-1)*Ts;
 
 ref = zeros(2, N_steps);
 ref(1,:) = 25; ref(2,:) = 25;
-ref(1, t_vec>=400) = 30;
-ref(2, t_vec>=800) = 20;
+ref(1, t_vec>=400)  = 30;       % cambio h3: 25 -> 30
+ref(2, t_vec>=800)  = 20;       % cambio h4: 25 -> 20
+ref(1, t_vec>=1200) = 25;       % h3 regresa a 25
+ref(2, t_vec>=1200) = 35;       % h4 sube a 35 (lejos del punto de linealizacion)
 
 t_ruido = 1100;
 sigma_ruido = 0.3;

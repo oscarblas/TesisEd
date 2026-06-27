@@ -114,7 +114,7 @@ fprintf('      [ %+.4f   1 ]\n\n', -k21);
 %  Escenario que evidencia el efecto del acoplamiento + ruido.
 % ========================================================================
 Ts = 1;
-t_sim = 1500;
+t_sim = 2000;
 N_steps = round(t_sim/Ts);
 t_vec = (0:N_steps-1)*Ts;
 
@@ -122,8 +122,10 @@ t_vec = (0:N_steps-1)*Ts;
 ref = zeros(2, N_steps);             % fila 1 = ref h3, fila 2 = ref h4
 ref(1,:) = 25;                       % h3 nominal todo el tiempo
 ref(2,:) = 25;                       % h4 nominal todo el tiempo
-ref(1, t_vec>=400) = 30;             % cambio h3: 25 -> 30 en t = 400
-ref(2, t_vec>=800) = 20;             % cambio h4: 25 -> 20 en t = 800
+ref(1, t_vec>=400)  = 30;            % cambio h3: 25 -> 30 en t = 400
+ref(2, t_vec>=800)  = 20;            % cambio h4: 25 -> 20 en t = 800
+ref(1, t_vec>=1200) = 25;            % h3 regresa a 25 en t = 1200
+ref(2, t_vec>=1200) = 35;            % h4 sube a 35 (lejos del punto nominal)
 
 % --- Activacion del ruido ---
 t_ruido = 1100;                      % desde t=1100 se inyecta ruido

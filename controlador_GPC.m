@@ -211,15 +211,17 @@ A_ineq_static = [ eye(nu*Nu);
 
 % Tiempo de simulacion y escenario (arranque desde h=0, cambios de
 % setpoint en t=400 y t=800, ruido inyectado desde t=1100)
-t_sim   = 1500;
+t_sim   = 2000;
 N_steps = round(t_sim/Ts);
 t_vec   = (0:N_steps-1)*Ts;
 
 ref = zeros(ny, N_steps);
 ref(1,:) = 25;
 ref(2,:) = 25;
-ref(1, t_vec>=400) = 30;     % h3: 25 -> 30 en t=400
-ref(2, t_vec>=800) = 20;     % h4: 25 -> 20 en t=800
+ref(1, t_vec>=400)  = 30;    % h3: 25 -> 30 en t=400
+ref(2, t_vec>=800)  = 20;    % h4: 25 -> 20 en t=800
+ref(1, t_vec>=1200) = 25;    % h3 regresa a 25 en t=1200
+ref(2, t_vec>=1200) = 35;    % h4 sube a 35 (lejos del punto nominal)
 
 t_ruido = 1100;              % desde t=1100 se inyecta ruido al sensor
 sigma_ruido = 0.3;           % desviacion estandar del ruido (cm)
